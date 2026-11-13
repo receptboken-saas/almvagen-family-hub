@@ -14,15 +14,61 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/useAuth";
+import { ACTIVE_PROFILE_KEY } from "@/lib/supabase/AuthProvider";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import {
-  PROFILE_SELECT_COLUMNS,
-  type Profile,
-  type ProfileRole,
-} from "@/lib/supabase/types";
+import type { ProfileRole } from "@/lib/supabase/types";
 import { CustomSvgIcon } from "@/components/icons/CustomIcons";
 import { ThemeToggle } from "@/components/ui/ThemeProvider";
 import { AvatarBadge } from "@/components/ui/AvatarBadge";
+
+interface PinProfile {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  avatar_icon: string | null;
+  role: ProfileRole;
+  has_pin: boolean;
+}
+
+interface PinLoginResponse {
+  token_hash?: string;
+  email?: string;
+  error?: string;
+}
+
+function isFunctionNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const record = err as {
+    message?: string;
+    context?: { status?: number };
+  };
+  if (record.context?.status === 404) return true;
+  const msg = record.message?.toLowerCase() ?? "";
+  return msg.includes("404") || msg.includes("not found");
+}
+
+async function extractFunctionErrorMessage(err: unknown): Promise<string> {
+  if (!err || typeof err !== "object") {
+    return "Felaktig PIN-kod. Försök igen.";
+  }
+  const record = err as {
+    message?: string;
+    context?: Response;
+  };
+  if (record.context && typeof record.context.json === "function") {
+    try {
+      const payload = (await record.context.clone().json()) as {
+        error?: string;
+        message?: string;
+      };
+      if (payload.error) return payload.error;
+      if (payload.message) return payload.message;
+    } catch {
+      // Ignore JSON parse errors
+    }
+  }
+  return record.message || "Felaktig PIN-kod. Försök igen.";
+}
 
 function getRoleLabel(role: ProfileRole): string {
   switch (role) {
@@ -51,40 +97,51 @@ export function LoginScreen() {
     user,
     signIn,
     signOut,
-    switchProfile,
     isConfigured,
-    isPinLocked,
-    isTrustedDevice,
   } = useAuth();
 
-  const [mode, setMode] = useState<"pin" | "password">(
-    isPinLocked || (isTrustedDevice && Boolean(user)) ? "pin" : "password",
-  );
+  const [mode, setMode] = useState<"pin" | "password">("pin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [familyRoster, setFamilyRoster] = useState<Profile[]>([]);
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
+  const [pinProfiles, setPinProfiles] = useState<PinProfile[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<PinProfile | null>(null);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
-    if (!supabase || !user) {
-      setFamilyRoster([]);
-      setSelectedProfile(null);
+    if (!supabase) {
+      setPinProfiles([]);
+      setIsLoadingProfiles(false);
       return;
     }
-    supabase
-      .from("profiles")
-      .select(PROFILE_SELECT_COLUMNS)
-      .order("display_name", { ascending: true })
-      .then(({ data }) => {
-        if (data) {
-          setFamilyRoster(data as Profile[]);
-        }
-      });
-  }, [user]);
+
+    let cancelled = false;
+    setIsLoadingProfiles(true);
+    supabase.rpc("get_pin_profiles").then(({ data, error: rpcError }) => {
+      if (cancelled) return;
+      if (rpcError) {
+        setError("Kunde inte hämta familjeprofiler just nu.");
+        setPinProfiles([]);
+      } else if (Array.isArray(data)) {
+        const sorted = [...(data as PinProfile[])].sort((a, b) => {
+          if (a.has_pin !== b.has_pin) return a.has_pin ? -1 : 1;
+          return (a.display_name ?? "").localeCompare(
+            b.display_name ?? "",
+            "sv",
+          );
+        });
+        setPinProfiles(sorted);
+      }
+      setIsLoadingProfiles(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handlePasswordSubmit(event: FormEvent) {
     event.preventDefault();
@@ -99,19 +156,90 @@ export function LoginScreen() {
     setIsSubmitting(false);
   }
 
-  async function handleSelectProfile(member: Profile) {
-    setError(null);
+  function handleSelectProfile(member: PinProfile) {
     setPin("");
-    if (!member.quick_pin) {
-      setIsSubmitting(true);
-      const result = await switchProfile(member);
-      if (result.error) {
-        setError(result.error);
-      }
+    if (!member.has_pin) {
+      setError(
+        `${member.display_name || "Denna profil"} saknar Snabb-PIN. Be admin sätta en 4-siffrig PIN under Familj & Surfplattor.`,
+      );
+      return;
+    }
+    setError(null);
+    setSelectedProfile(member);
+  }
+
+  async function submitPinLogin(cleanPin: string) {
+    if (!selectedProfile || cleanPin.length !== 4 || isSubmitting) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setError("Supabase är inte konfigurerat.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    const payload = {
+      profile_id: selectedProfile.id,
+      pin: cleanPin,
+    };
+
+    let response = await supabase.functions.invoke<PinLoginResponse>(
+      "pin-login",
+      { body: payload },
+    );
+
+    if (response.error && isFunctionNotFoundError(response.error)) {
+      response = await supabase.functions.invoke<PinLoginResponse>(
+        "bright-responder",
+        { body: payload },
+      );
+    }
+
+    if (response.error) {
+      const msg = await extractFunctionErrorMessage(response.error);
+      setError(msg);
+      setPin("");
       setIsSubmitting(false);
       return;
     }
-    setSelectedProfile(member);
+
+    const tokenHash = response.data?.token_hash;
+    if (!tokenHash) {
+      setError(
+        response.data?.error ??
+          "Kunde inte verifiera PIN-inloggningen. Försök igen.",
+      );
+      setPin("");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(ACTIVE_PROFILE_KEY, selectedProfile.id);
+      window.localStorage.setItem("active_profile_id", selectedProfile.id);
+    } catch {
+      // Ignore storage errors
+    }
+
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: "magiclink",
+    });
+
+    if (otpError) {
+      if (!user) {
+        try {
+          window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+          window.localStorage.removeItem("active_profile_id");
+        } catch {
+          // Ignore
+        }
+      }
+      setError(otpError.message);
+      setPin("");
+    }
+    setIsSubmitting(false);
   }
 
   async function handlePinDigit(digit: string) {
@@ -121,13 +249,7 @@ export function LoginScreen() {
     setError(null);
 
     if (nextPin.length === 4) {
-      setIsSubmitting(true);
-      const result = await switchProfile(selectedProfile, nextPin);
-      if (result.error) {
-        setError(result.error);
-        setPin("");
-      }
-      setIsSubmitting(false);
+      await submitPinLogin(nextPin);
     }
   }
 
@@ -210,30 +332,34 @@ export function LoginScreen() {
 
         {mode === "pin" ? (
           <div className="mt-6 space-y-5">
-            {!user ? (
-              <p className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/70 p-4 text-center text-xs leading-relaxed text-[var(--text-secondary)]">
-                Första gången på denna enhet? Logga in med familjens e-post &amp;
-                lösenord en gång under fliken E-post först – därefter kan du
-                alltid logga in med ett tryck och din Snabb-PIN.
-              </p>
-            ) : !selectedProfile ? (
+            {!selectedProfile ? (
               <div className="space-y-3">
                 <p className="text-center text-xs font-medium text-[var(--text-secondary)]">
-                  Välj vem du är för att fortsätta
+                  Välj vem du är för att logga in med Snabb-PIN
                 </p>
-                {familyRoster.length === 0 ? (
+                {isLoadingProfiles ? (
+                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/60 p-5 text-xs text-[var(--text-secondary)]">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#6B8E6B]" />
+                    <span>Hämtar familjeprofiler...</span>
+                  </div>
+                ) : pinProfiles.length === 0 ? (
                   <p className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/60 p-4 text-center text-xs text-[var(--text-secondary)]">
-                    Inga familjeprofiler hittades ännu.
+                    Inga familjeprofiler hittades ännu. Logga in med e-post &amp;
+                    lösenord för att konfigurera profiler.
                   </p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2.5">
-                    {familyRoster.map((member) => (
+                    {pinProfiles.map((member) => (
                       <button
                         key={member.id}
                         type="button"
                         disabled={isSubmitting}
                         onClick={() => handleSelectProfile(member)}
-                        className="group flex flex-col items-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-3.5 text-center transition-all hover:border-[#6B8E6B] hover:bg-[#6B8E6B]/10 active:scale-[0.98] disabled:opacity-50"
+                        className={`group flex flex-col items-center gap-2 rounded-2xl border p-3.5 text-center transition-all active:scale-[0.98] disabled:opacity-50 ${
+                          member.has_pin
+                            ? "border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:border-[#6B8E6B] hover:bg-[#6B8E6B]/10"
+                            : "border-[var(--border-subtle)]/70 bg-[var(--bg-subtle)]/50 opacity-75 hover:opacity-100"
+                        }`}
                       >
                         <AvatarBadge
                           avatarUrl={member.avatar_url}
@@ -246,14 +372,21 @@ export function LoginScreen() {
                             <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
                               {member.display_name || "Profil"}
                             </span>
-                            {member.quick_pin && (
-                              <Lock className="h-3 w-3 shrink-0 text-[var(--text-secondary)]" />
+                            {member.has_pin && (
+                              <Lock className="h-3 w-3 shrink-0 text-[#6B8E6B]" />
                             )}
                           </div>
-                          <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
-                            <RoleIcon role={member.role} />
-                            {getRoleLabel(member.role)}
-                          </span>
+                          <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+                              <RoleIcon role={member.role} />
+                              {getRoleLabel(member.role)}
+                            </span>
+                            {!member.has_pin && (
+                              <span className="rounded-full border border-[#D49A42]/40 bg-[#D49A42]/10 px-2 py-0.5 text-[10px] font-medium text-[#D49A42]">
+                                Saknar PIN
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </button>
                     ))}
@@ -262,7 +395,7 @@ export function LoginScreen() {
               </div>
             ) : (
               <div className="space-y-5">
-                <div className="flex items-center justify-between gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/60 px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2 rounded-2xl border border-[#6B8E6B]/40 bg-[#6B8E6B]/10 px-3 py-2.5">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <AvatarBadge
                       avatarUrl={selectedProfile.avatar_url}
@@ -349,6 +482,24 @@ export function LoginScreen() {
                     <Delete className="h-5 w-5" />
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting || pin.length !== 4}
+                  onClick={() => submitPinLogin(pin)}
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#6B8E6B] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#5B7D5B] disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loggar in...</span>
+                    </>
+                  ) : (
+                    <span>
+                      Logga in som {selectedProfile.display_name || "Profil"}
+                    </span>
+                  )}
+                </button>
               </div>
             )}
 

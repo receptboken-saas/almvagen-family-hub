@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.12.0] – 2026-11-13 (Fristående Snabb-PIN via RPC & Edge Function)
+- **Direkt Snabb-PIN utan föregående admin-inlogg (`LoginScreen.tsx`):** Startskärmen hämtar familjemedlemmar och surfplattor direkt via `supabase.rpc('get_pin_profiles')` även i oinloggat läge och visar klickbara avatar-kort med roll-badge och PIN-status (`Saknar PIN` om PIN saknas).
+- **Riktig Supabase-session via `pin-login` (`LoginScreen.tsx`):** Vid 4-siffrig PIN anropas Edge Function `pin-login` (med fallback till `bright-responder`), returnerad `token_hash` verifieras via `supabase.auth.verifyOtp({ token_hash, type: 'magiclink' })` och `active_profile_id` sparas i `localStorage`.
+- **PIN-sessionsstöd i `AuthProvider.tsx`:** Läser `user_metadata.profile_id` för `@family.almvagen.local`-sessioner och sparad `active_profile_id` / `almvagen_active_profile_id` från `localStorage`, samt rensar låsstatus vid `SIGNED_IN` och håller profilväxling i `ProfileSwitcherModal` synkad med `baseProfile`.
+
 ## [0.11.0] – 2026-11-13 (Klickbar Snabb-PIN per familjemedlem & surfplatta)
 - **Klickbara profilkort i Snabb-PIN (`LoginScreen.tsx`):** När en enhet är auktoriserad hämtas alla profiler från `public.profiles` och visas som taktila avatar-kort med namn, roll-badge (`Admin` / `Väggplatta` / `Familjemedlem`) och PIN-indikator. Klick på en profil med `quick_pin` öppnar sifferknappsatsen för just den personen (`switchProfile`), medan profiler utan PIN aktiveras direkt med ett tryck.
 - **Tydlig onboarding för nya enheter (`LoginScreen.tsx`):** Om enheten saknar aktiv familjesession visas en tydlig vägledning under Snabb-PIN-fliken om att logga in med e-post och lösenord första gången.

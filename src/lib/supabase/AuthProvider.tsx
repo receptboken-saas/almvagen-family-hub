@@ -13,7 +13,8 @@ import { getSupabaseClient, isSupabaseConfigured } from "./client";
 import { PROFILE_SELECT_COLUMNS, type Profile } from "./types";
 
 const TRUSTED_DEVICE_KEY = "almvagen_trusted_device";
-const ACTIVE_PROFILE_KEY = "almvagen_active_profile_id";
+export const ACTIVE_PROFILE_KEY = "almvagen_active_profile_id";
+const LEGACY_ACTIVE_PROFILE_KEY = "active_profile_id";
 
 export interface AuthContextValue {
   session: Session | null;
@@ -48,36 +49,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isTrustedDevice, setIsTrustedDevice] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(configured);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (authUser: User) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
+
+    const isPinSession = Boolean(
+      authUser.email?.toLowerCase().endsWith("@family.almvagen.local"),
+    );
+    const metaProfileId =
+      typeof authUser.user_metadata?.profile_id === "string"
+        ? authUser.user_metadata.profile_id
+        : null;
+
+    let savedProfileId: string | null = null;
+    try {
+      savedProfileId =
+        window.localStorage.getItem(ACTIVE_PROFILE_KEY) ??
+        window.localStorage.getItem(LEGACY_ACTIVE_PROFILE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+
+    const targetBaseId =
+      (isPinSession && metaProfileId) || savedProfileId || authUser.id;
 
     const { data, error } = await supabase
       .from("profiles")
       .select(PROFILE_SELECT_COLUMNS)
-      .eq("id", userId)
+      .eq("id", targetBaseId)
       .maybeSingle();
 
     if (!error && data) {
       setBaseProfile(data as Profile);
+    } else if (targetBaseId !== authUser.id) {
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from("profiles")
+        .select(PROFILE_SELECT_COLUMNS)
+        .eq("id", authUser.id)
+        .maybeSingle();
+      setBaseProfile(
+        !fallbackErr && fallbackData ? (fallbackData as Profile) : null,
+      );
     } else {
       setBaseProfile(null);
     }
 
-    try {
-      const savedProfileId = window.localStorage.getItem(ACTIVE_PROFILE_KEY);
-      if (savedProfileId && savedProfileId !== userId) {
-        const { data: savedData, error: savedErr } = await supabase
-          .from("profiles")
-          .select(PROFILE_SELECT_COLUMNS)
-          .eq("id", savedProfileId)
-          .maybeSingle();
-        if (!savedErr && savedData) {
-          setOverrideProfile(savedData as Profile);
-        }
+    if (savedProfileId && savedProfileId !== targetBaseId) {
+      const { data: savedData, error: savedErr } = await supabase
+        .from("profiles")
+        .select(PROFILE_SELECT_COLUMNS)
+        .eq("id", savedProfileId)
+        .maybeSingle();
+      if (!savedErr && savedData) {
+        setOverrideProfile(savedData as Profile);
+      } else {
+        setOverrideProfile(null);
       }
-    } catch {
-      // Ignore storage errors
+    } else {
+      setOverrideProfile(null);
     }
   }, []);
 
@@ -112,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // Ignore
         }
-        await fetchProfile(nextSession.user.id);
+        await fetchProfile(nextSession.user);
       }
       if (mounted) {
         setIsLoading(false);
@@ -121,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       if (!mounted) return;
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
@@ -132,7 +161,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // Ignore
         }
-        await fetchProfile(nextSession.user.id);
+        if (event === "SIGNED_IN") {
+          setIsPinLocked(false);
+        }
+        await fetchProfile(nextSession.user);
       } else {
         setBaseProfile(null);
         setOverrideProfile(null);
@@ -168,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOverrideProfile(null);
       try {
         window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+        window.localStorage.removeItem(LEGACY_ACTIVE_PROFILE_KEY);
       } catch {
         // Ignore
       }
@@ -182,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     try {
       window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+      window.localStorage.removeItem(LEGACY_ACTIVE_PROFILE_KEY);
     } catch {
       // Ignore
     }
@@ -191,8 +225,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (user?.id) {
-      await fetchProfile(user.id);
+    if (user) {
+      await fetchProfile(user);
     }
     if (overrideProfile?.id) {
       const supabase = getSupabaseClient();
@@ -207,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [user?.id, overrideProfile?.id, fetchProfile]);
+  }, [user, overrideProfile?.id, fetchProfile]);
 
   const lockWithPin = useCallback(() => {
     if (user) {
@@ -268,12 +302,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { error: "Felaktig PIN-kod för denna profil." };
         }
       }
-      setOverrideProfile(targetProfile.id === user?.id ? null : targetProfile);
+      const baseId = baseProfile?.id ?? user?.id;
+      const isBase = targetProfile.id === baseId;
+      setOverrideProfile(isBase ? null : targetProfile);
       try {
-        if (targetProfile.id === user?.id) {
+        if (isBase) {
           window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+          window.localStorage.removeItem(LEGACY_ACTIVE_PROFILE_KEY);
         } else {
           window.localStorage.setItem(ACTIVE_PROFILE_KEY, targetProfile.id);
+          window.localStorage.setItem(LEGACY_ACTIVE_PROFILE_KEY, targetProfile.id);
         }
       } catch {
         // Ignore
@@ -281,12 +319,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsPinLocked(false);
       return { error: null };
     },
-    [user?.id],
+    [baseProfile?.id, user?.id],
   );
 
   const resetActiveProfile = useCallback(() => {
     try {
       window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+      window.localStorage.removeItem(LEGACY_ACTIVE_PROFILE_KEY);
     } catch {
       // Ignore
     }
