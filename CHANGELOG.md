@@ -2,6 +2,28 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.1] – 2026-11-13 (1-klicks "Skanna Home Assistant" för Energi & Drift)
+- **Automatisk enhetsupptäckt (`energyDiscovery.ts`):** Läser HA:s `device_registry`, `entity_registry` och `area_registry` via WebSocket och grupperar automatiskt varje pryls effekt- (`W`), energi- (`kWh`), pris- och driftstatus-sensorer (t.ex. *"Laddar"*, *"Värmer"*, *"Tvättar"*).
+- **1-klicks konfiguration (`EnergyConfigModal.tsx`, `energyConfig.ts`, `energyEngine.ts`, `EnergyDashboard.tsx`):** Ny flik *"✨ Smart Skanna HA"* där Admin kan skanna och aktivera upptäckta prylar (även om de inte ligger i ett rum i Supabase) samt sätta schablon (9 W) på alla lampor utan elmätare med ett klick.
+
+## [0.18.0] – 2026-11-13 (Smart Energi & Drift: Grupper, Kostnad, Effekttoppar & Gemini Energirådgivare)
+- **Home Assistant-statistik (`wsClient.ts`, `HAProvider.tsx`, `energyStats.ts`):** Lade till generisk `sendCommand`-metod på WebSocket-klienten samt hämtning av historik via `recorder/statistics_during_period` för tidsperioderna *Just nu*, *Idag*, *7 dagar* och *30 dagar*, inklusive beräkning av månadens 3 högsta effekttoppar, nattlig baslast (00:00–05:00) och billigaste 2h/3h-prisfönster.
+- **Datadriven energimotor & konfigurering (`energyConfig.ts`, `energyEngine.ts`, `EnergyConfigModal.tsx`):** 100 % datadriven kategorisering (*Belysning* med uppdelning per våning, *Uppvärmning & Klimat*, *Vitvaror & Tvätt*, *Elbilsladdning*, *Övrig drift & Baslast*) med stöd för huvudmätare, elpris + nätavgift, huvudsäkringsvakt (A), enskilda W/kWh-sensorer och märkeffekt (W) för enheter utan egen elmätare.
+- **Ny *Energi & Drift*-vy (`EnergyDashboard.tsx`, `EnergyGeminiAdvisor.tsx`, `page.tsx`):** Komplett översikt med kostnad och kWh per grupp, våning, rum och enskild enhet, samt integrerad **Gemini Energirådgivare** (`gemini-hub-assistant`) som cachar analys + 3 konkreta spartips i Supabase och stöder följdfrågor.
+
+## [0.17.1] – 2026-11-13 (Tydligare felhantering & manuell lovdags-fallback i Admin)
+- **Skola & Lovdagar (`AdminPanel.tsx`):** Visar ett tydligt svenskt felmeddelande i terrakotta (`#C86D51`) när `gemini-hub-assistant` har tillfälligt hög belastning/timeout, samt lägger till knappen **"Lägg till manuellt"** under varje profil för att spara enskilda lovdagar/studiedagar direkt till `weekly_events` (`category: 'school_off'`).
+
+## [0.17.0] – 2026-11-13 (Google Kalender-koppling via OAuth & automatiska lovdagar i Familjekalendern)
+- **Automatisk visning av lovdagar & händelser (`FamilyCalendarCard.tsx`, `page.tsx`):** `Familjekalender & Lovdagar` visar nu automatiskt alla skollov, lediga dagar (`school_off`) och kalenderhändelser från `weekly_events` samt sparar nya händelser direkt dit (så de även syns i `Denna vecka` och `Händer idag`).
+- **Google Kalender-koppling via Google-inloggning (`calendarClient.ts`, `FamilyCalendarCard.tsx`):** Admin (`isAdmin`) kan logga in/koppla med Google OAuth (`linkIdentity` / `signInWithOAuth`), välja er gemensamma familjekalender, hämta händelser till `weekly_events` (så alla surfplattor och familjemedlemmar ser dem), skicka upp barnens lovdagar till Google Kalender samt automatiskt spegla nya händelser som Admin lägger till direkt in i er gemensamma Google Kalender.
+
+## [0.16.0] – 2026-11-13 (Middagsplanering för Admin, "Vad blir det till middag idag?" & "Händer idag"-widget för surfplattor)
+- **Ny `"Händer idag"`-widget för väggplattor (`HappeningTodayCard.tsx`):** Visas på startvyn (*Hem & Styrning*) på surfplattor i kök/hall och desktop (`>= 640px`). Samlar dagens datum, *"Vad blir det till middag idag?"* (med snabbredigering för `admin`), dagens händelser från `weekly_events` (lovdagar, sophämtning, kalender/påminnelser), morgondagens sophämtningspåminnelse, live HA-sophämtningssensor samt upp till 3 nålade familjelappar.
+- **Rollstyrd `"Vad blir det till middag idag?"` (`DinnerPlannerCard.tsx`, `page.tsx`):** Redigering kräver nu `canEdit={isAdmin}`. För övriga familjemedlemmar, surfplattor och barn (`child`-vyn med kompakt kort) visas den som en ren läs-widget med titeln *"Vad blir det till middag idag?"*, anteckningar och klickbar receptlänk.
+- **Admin-flik för veckans middagar (`AdminDinnerTab.tsx`, `AdminPanel.tsx`):** Ny flik *"Veckans middag"* i `Redigera hemmet` där admin kan planera Mån–Sön för både *Denna vecka* och *Nästa vecka* (maträtt, anteckning/tillbehör och receptlänk) direkt mot `dinner_plans`.
+- **Utökat middagsfönster (`useHomeData.ts`):** Hämtar `dinner_plans` för både innevarande och nästa vecka (`mondayStr`–`nextSundayStr`) så söndagens *"Imorgon"* och nästa veckas planering alltid fungerar.
+
 ## [0.15.0] – 2026-11-13 (Smart Sophämtning med Kommun, Gemini-synk & 1–2 dagars påminnelse)
 - **Kommun- & kärlinställning direkt på kortet (`WasteScheduleCard.tsx`):** Visar sparad kommun från `household_settings`, har fällbar panel *"Ställ in kommun & kärl"* med textfält för kommun och område/kärl samt knappen *"Hämta schema med Gemini"* (`gemini-hub-assistant` med `action: 'sync_waste_schedule'`) och manuell knapp *"+ Lägg till enstaka tömning"*.
 - **Automatiska påminnelser 0, 1 och 2 dagar innan (`WasteScheduleCard.tsx`):** Visar de 4 närmaste kommande `waste`-händelserna från `weekly_events` med tydliga badges (*"Töms idag!"* med pulsande ikon, *"Imorgon – ställ ut tunnan!"*, *"Om 2 dagar"*) samt radering av enstaka rader.

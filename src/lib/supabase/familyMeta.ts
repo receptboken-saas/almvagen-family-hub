@@ -14,6 +14,8 @@ export const SYSTEM_NOTE_PREFIXES = [
   "[DINNER:",
   "[WASTE:",
   "[CALENDAR:",
+  "[ENERGY_CFG:",
+  "[ENERGY_AI:",
 ] as const;
 
 export function isSystemFamilyNote(content: string): boolean {

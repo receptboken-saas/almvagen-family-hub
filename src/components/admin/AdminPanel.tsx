@@ -41,6 +41,7 @@ import {
 } from "@/lib/supabase/types";
 import { AvatarBadge } from "@/components/ui/AvatarBadge";
 import { DynamicIcon } from "@/components/ui/IconResolver";
+import { AdminDinnerTab } from "./AdminDinnerTab";
 import { HAEntityPicker } from "./HAEntityPicker";
 import { IconPicker } from "./IconPicker";
 import { inferHAConfig } from "./haAutoConfig";
@@ -53,7 +54,7 @@ interface AdminPanelProps {
   onDataChanged: () => Promise<void>;
 }
 
-type AdminTab = "rooms" | "properties" | "devices" | "widgets" | "family";
+type AdminTab = "rooms" | "properties" | "devices" | "widgets" | "family" | "dinner";
 
 const WIDGET_TYPES: WidgetType[] = [
   "light",
@@ -167,7 +168,16 @@ export function AdminPanel({
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [editingDefaultView, setEditingDefaultView] = useState<HubViewId>("home");
   const [syncingSchoolId, setSyncingSchoolId] = useState<string | null>(null);
-  const [schoolSyncMsg, setSchoolSyncMsg] = useState<string | null>(null);
+  const [schoolSyncMsg, setSchoolSyncMsg] = useState<{
+    text: string;
+    isError?: boolean;
+  } | null>(null);
+  const [showManualHolidayForm, setShowManualHolidayForm] = useState(false);
+  const [manualHolidayTitle, setManualHolidayTitle] = useState("");
+  const [manualHolidayStart, setManualHolidayStart] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [manualHolidayEnd, setManualHolidayEnd] = useState("");
 
   // Household settings (municipality + optional HA waste sensor)
   const effectivePropertyId = activePropertyId ?? data.properties[0]?.id ?? "";
@@ -803,7 +813,16 @@ export function AdminPanel({
             // Ignore JSON parse errors
           }
         }
-        setSchoolSyncMsg(`Kunde inte synka: ${errorMsg}`);
+        const isOverloaded =
+          errorMsg.includes("high demand") ||
+          errorMsg.includes("aborted") ||
+          errorMsg.includes("no longer available");
+        setSchoolSyncMsg({
+          text: isOverloaded
+            ? "Gemini har tillfälligt hög belastning just nu. Försök igen om en stund eller lägg till lovdagen manuellt nedan."
+            : `Kunde inte synka: ${errorMsg}`,
+          isError: true,
+        });
       } else {
         const res = fnData as {
           message?: string;
@@ -811,21 +830,60 @@ export function AdminPanel({
           events_count?: number;
         } | null;
         const count = res?.synced_count ?? res?.events_count;
-        setSchoolSyncMsg(
-          res?.message ||
+        setSchoolSyncMsg({
+          text:
+            res?.message ||
             (typeof count === "number"
               ? `${count} lovperioder synkade`
               : "Lovdagar synkade med Gemini"),
-        );
+        });
         await onDataChanged();
       }
     } catch (err) {
-      setSchoolSyncMsg(
-        err instanceof Error ? err.message : "Fel vid Gemini-synk.",
-      );
+      setSchoolSyncMsg({
+        text: err instanceof Error ? err.message : "Fel vid Gemini-synk.",
+        isError: true,
+      });
     } finally {
       setSyncingSchoolId(null);
     }
+  }
+
+  async function handleAddManualHoliday(draft: Profile) {
+    const supabase = getSupabaseClient();
+    const title = manualHolidayTitle.trim();
+    if (!supabase || !effectivePropertyId || !title || !manualHolidayStart) {
+      return;
+    }
+
+    setBusy(true);
+    setSchoolSyncMsg(null);
+    const endDate =
+      manualHolidayEnd && manualHolidayEnd >= manualHolidayStart
+        ? manualHolidayEnd
+        : manualHolidayStart;
+
+    const { error } = await supabase.from("weekly_events").insert({
+      property_id: effectivePropertyId,
+      profile_id: draft.id,
+      category: "school_off",
+      title,
+      subtitle: draft.display_name || draft.school_name || null,
+      start_date: manualHolidayStart,
+      end_date: endDate,
+      source: "manual",
+    });
+
+    if (error) {
+      setSchoolSyncMsg({ text: error.message, isError: true });
+    } else {
+      setManualHolidayTitle("");
+      setManualHolidayEnd("");
+      setShowManualHolidayForm(false);
+      setSchoolSyncMsg({ text: `Lade till "${title}" för ${draft.display_name ?? "profilen"}.` });
+      await onDataChanged();
+    }
+    setBusy(false);
   }
 
   async function handleDeleteProfile(profileId: string) {
@@ -937,6 +995,7 @@ export function AdminPanel({
               { id: "devices", label: "Alla Enheter" },
               { id: "widgets", label: "Översikts-widgets" },
               { id: "family", label: "Familj & Surfplattor" },
+              { id: "dinner", label: "Veckans middag" },
             ] as const
           ).map((item) => (
             <button
@@ -2778,12 +2837,72 @@ export function AdminPanel({
                                     : "Synka lovdagar med Gemini"}
                                 </span>
                               </button>
-                              {schoolSyncMsg && (
-                                <span className="text-xs font-medium text-[#6B8E6B]">
-                                  {schoolSyncMsg}
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowManualHolidayForm((prev) => !prev)
+                                }
+                                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-secondary)] hover:border-[#6B8E6B] hover:text-[var(--text-primary)]"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                <span>Lägg till manuellt</span>
+                              </button>
                             </div>
+                            {schoolSyncMsg && (
+                              <p
+                                className={`text-xs font-medium ${
+                                  schoolSyncMsg.isError
+                                    ? "text-[#C86D51]"
+                                    : "text-[#6B8E6B]"
+                                }`}
+                              >
+                                {schoolSyncMsg.text}
+                              </p>
+                            )}
+                            {showManualHolidayForm && (
+                              <div className="grid grid-cols-1 gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 sm:grid-cols-4">
+                                <input
+                                  type="text"
+                                  value={manualHolidayTitle}
+                                  onChange={(e) =>
+                                    setManualHolidayTitle(e.target.value)
+                                  }
+                                  placeholder="T.ex. Studiedag eller Jullov"
+                                  className={`${inputClass} sm:col-span-2`}
+                                />
+                                <input
+                                  type="date"
+                                  value={manualHolidayStart}
+                                  onChange={(e) =>
+                                    setManualHolidayStart(e.target.value)
+                                  }
+                                  aria-label="Startdatum lovdag"
+                                  className={inputClass}
+                                />
+                                <div className="flex gap-2">
+                                  <input
+                                    type="date"
+                                    value={manualHolidayEnd}
+                                    min={manualHolidayStart}
+                                    onChange={(e) =>
+                                      setManualHolidayEnd(e.target.value)
+                                    }
+                                    aria-label="Slutdatum lovdag"
+                                    className={inputClass}
+                                  />
+                                  <button
+                                    type="button"
+                                    disabled={busy || !manualHolidayTitle.trim()}
+                                    onClick={() =>
+                                      void handleAddManualHoliday(draft)
+                                    }
+                                    className="min-h-10 shrink-0 rounded-xl bg-[#6B8E6B] px-3 text-xs font-semibold text-white hover:bg-[#5B7D5B] disabled:opacity-45"
+                                  >
+                                    Spara
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           <IconPicker
@@ -2943,6 +3062,15 @@ export function AdminPanel({
                 })}
               </div>
             </div>
+          )}
+
+          {tab === "dinner" && (
+            <AdminDinnerTab
+              propertyId={activePropertyId ?? data.properties[0]?.id ?? null}
+              dinnerPlans={data.dinnerPlans}
+              onDataChanged={onDataChanged}
+              onFeedback={setFeedback}
+            />
           )}
         </div>
 

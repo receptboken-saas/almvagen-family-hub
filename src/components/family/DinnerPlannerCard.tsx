@@ -19,6 +19,7 @@ interface DinnerPlannerCardProps {
   dinnerPlans: DinnerPlan[];
   onDataChanged: () => Promise<void> | void;
   canEdit?: boolean;
+  compact?: boolean;
 }
 
 const WEEKDAY_NAMES = [
@@ -49,12 +50,14 @@ export function DinnerPlannerCard({
   propertyId,
   dinnerPlans,
   onDataChanged,
-  canEdit = true,
+  canEdit = false,
+  compact = false,
 }: DinnerPlannerCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [draftDish, setDraftDish] = useState("");
   const [draftUrl, setDraftUrl] = useState("");
+  const [draftNotes, setDraftNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
   const { todayStr, tomorrowStr, weekDays } = useMemo(() => {
@@ -91,6 +94,7 @@ export function DinnerPlannerCard({
     const existing = planByDate.get(editingDate);
     const dish = draftDish.trim();
     const url = draftUrl.trim() || null;
+    const notes = draftNotes.trim() || null;
 
     if (!dish) {
       if (existing) {
@@ -102,6 +106,7 @@ export function DinnerPlannerCard({
         .update({
           dish_name: dish,
           recipe_url: url,
+          notes,
           updated_at: new Date().toISOString(),
         })
         .eq("id", existing.id);
@@ -111,14 +116,23 @@ export function DinnerPlannerCard({
         meal_date: editingDate,
         dish_name: dish,
         recipe_url: url,
+        notes,
       });
     }
 
     setEditingDate(null);
     setDraftDish("");
     setDraftUrl("");
+    setDraftNotes("");
     await onDataChanged();
     setBusy(false);
+  }
+
+  function startEditing(dateStr: string, plan?: DinnerPlan) {
+    setEditingDate(dateStr);
+    setDraftDish(plan?.dish_name ?? "");
+    setDraftUrl(plan?.recipe_url ?? "");
+    setDraftNotes(plan?.notes ?? "");
   }
 
   return (
@@ -129,51 +143,123 @@ export function DinnerPlannerCard({
             <UtensilsCrossed className="h-4 w-4" aria-hidden="true" />
           </div>
           <h3 className="font-display text-base font-semibold text-[var(--text-primary)] sm:text-lg">
-            Vad blir det till middag?
+            {canEdit ? "Vad blir det till middag?" : "Vad blir det till middag idag?"}
           </h3>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          aria-expanded={expanded}
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/70 px-3 py-1 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[#6B8E6B]"
-        >
-          {canEdit && <Pencil className="h-3 w-3 text-[#6B8E6B]" />}
-          <span>Veckans mat</span>
-          <ChevronDown
-            className={`h-3.5 w-3.5 text-[var(--text-secondary)] transition-transform ${
-              expanded ? "rotate-180" : ""
-            }`}
-            aria-hidden="true"
-          />
-        </button>
+        {!compact && (
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            aria-expanded={expanded}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/70 px-3 py-1 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[#6B8E6B]"
+          >
+            {canEdit && <Pencil className="h-3 w-3 text-[#6B8E6B]" />}
+            <span>Veckans mat</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-[var(--text-secondary)] transition-transform ${
+                expanded ? "rotate-180" : ""
+              }`}
+              aria-hidden="true"
+            />
+          </button>
+        )}
       </div>
 
       {/* Default KISS view: max 2 rows (Today & Tomorrow) */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#6B8E6B]/35 bg-[#6B8E6B]/10 px-3.5 py-2.5 text-sm">
-          <div className="min-w-0">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B8E6B]">
-              Idag:{" "}
-            </span>
-            <span className="font-semibold text-[var(--text-primary)]">
-              {todayPlan?.dish_name || "Ej planerat"}
-            </span>
+        {canEdit && editingDate === todayStr && !expanded ? (
+          <form
+            onSubmit={saveDayMeal}
+            className="space-y-2 rounded-xl border border-[#6B8E6B]/45 bg-[#6B8E6B]/10 p-3"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B8E6B]">
+                Idag:
+              </span>
+              <input
+                type="text"
+                autoFocus
+                value={draftDish}
+                onChange={(e) => setDraftDish(e.target.value)}
+                placeholder="Vad blir det till middag?"
+                className="min-h-9 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-2.5 text-xs text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={busy}
+                aria-label="Spara dagens middag"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#6B8E6B] text-white"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingDate(null)}
+                aria-label="Avbryt"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input
+                type="text"
+                value={draftNotes}
+                onChange={(e) => setDraftNotes(e.target.value)}
+                placeholder="Valfri anteckning (t.ex. tillbehör)"
+                className="min-h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-2.5 text-[11px] text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+              />
+              <input
+                type="url"
+                value={draftUrl}
+                onChange={(e) => setDraftUrl(e.target.value)}
+                placeholder="Valfri receptlänk (https://…)"
+                className="min-h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-2.5 text-[11px] text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+              />
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[#6B8E6B]/35 bg-[#6B8E6B]/10 px-3.5 py-2.5 text-sm">
+            <div className="min-w-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B8E6B]">
+                Idag:{" "}
+              </span>
+              <span className="font-semibold text-[var(--text-primary)]">
+                {todayPlan?.dish_name || "Ej planerat"}
+              </span>
+              {todayPlan?.notes && (
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                  {todayPlan.notes}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {todayPlan?.recipe_url && (
+                <a
+                  href={todayPlan.recipe_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Öppna recept för idag"
+                  className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#6B8E6B] hover:underline"
+                >
+                  <span>Recept</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => startEditing(todayStr, todayPlan)}
+                  aria-label="Redigera dagens middag"
+                  className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
-          {todayPlan?.recipe_url && (
-            <a
-              href={todayPlan.recipe_url}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Öppna recept för idag"
-              className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#6B8E6B] hover:underline"
-            >
-              <span>Recept</span>
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          )}
-        </div>
+        )}
 
         <div className="flex items-center justify-between gap-3 rounded-xl border border-[#D49A42]/35 bg-[#D49A42]/10 px-3.5 py-2.5 text-sm">
           <div className="min-w-0">
@@ -183,6 +269,11 @@ export function DinnerPlannerCard({
             <span className="font-semibold text-[var(--text-primary)]">
               {tomorrowPlan?.dish_name || "Ej planerat"}
             </span>
+            {tomorrowPlan?.notes && (
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                {tomorrowPlan.notes}
+              </p>
+            )}
           </div>
           {tomorrowPlan?.recipe_url && (
             <a
@@ -200,7 +291,7 @@ export function DinnerPlannerCard({
       </div>
 
       {/* Expanded Mon-Sun view */}
-      {expanded && (
+      {!compact && expanded && (
         <ul className="divide-y divide-[var(--border-subtle)]/70 border-t border-[var(--border-subtle)] pt-2">
           {weekDays.map((day) => {
             const plan = planByDate.get(day.date);
@@ -240,13 +331,22 @@ export function DinnerPlannerCard({
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <input
-                      type="url"
-                      value={draftUrl}
-                      onChange={(e) => setDraftUrl(e.target.value)}
-                      placeholder="Valfri receptlänk (https://…)"
-                      className="ml-18 min-h-8 w-[calc(100%-4.5rem)] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-2.5 text-[11px] text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
-                    />
+                    <div className="ml-18 grid w-[calc(100%-4.5rem)] grid-cols-1 gap-2 sm:grid-cols-2">
+                      <input
+                        type="text"
+                        value={draftNotes}
+                        onChange={(e) => setDraftNotes(e.target.value)}
+                        placeholder="Valfri anteckning…"
+                        className="min-h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-2.5 text-[11px] text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+                      />
+                      <input
+                        type="url"
+                        value={draftUrl}
+                        onChange={(e) => setDraftUrl(e.target.value)}
+                        placeholder="Valfri receptlänk (https://…)"
+                        className="min-h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-2.5 text-[11px] text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+                      />
+                    </div>
                   </form>
                 ) : (
                   <div className="flex items-center justify-between gap-2 text-xs">
@@ -284,11 +384,7 @@ export function DinnerPlannerCard({
                     {canEdit && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setEditingDate(day.date);
-                          setDraftDish(plan?.dish_name ?? "");
-                          setDraftUrl(plan?.recipe_url ?? "");
-                        }}
+                        onClick={() => startEditing(day.date, plan)}
                         aria-label={`Redigera middag för ${day.label}`}
                         className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
                       >

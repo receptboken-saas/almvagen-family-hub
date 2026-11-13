@@ -24,6 +24,10 @@ export interface HAContextValue {
     service: string,
     serviceData?: Record<string, unknown>,
   ) => Promise<unknown>;
+  sendCommand: <T = unknown>(
+    type: string,
+    payload?: Record<string, unknown>,
+  ) => Promise<T>;
   connectWithConfig: (wsUrl: string, token: string) => void;
   disconnect: () => void;
   clearConfig: () => void;
@@ -58,6 +62,12 @@ export function HAProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const sendCommand = useCallback(
+    <T = unknown,>(type: string, payload?: Record<string, unknown>) =>
+      haWsClient.sendCommand<T>(type, payload),
+    [],
+  );
+
   const connectWithConfig = useCallback((wsUrl: string, token: string) => {
     haWsClient.disconnect();
     haWsClient.setConfig(wsUrl, token, true);
@@ -82,6 +92,7 @@ export function HAProvider({ children }: { children: ReactNode }) {
       hasToken: snapshot.hasToken,
       getEntity,
       callService,
+      sendCommand,
       connectWithConfig,
       disconnect,
       clearConfig,
@@ -90,6 +101,7 @@ export function HAProvider({ children }: { children: ReactNode }) {
       snapshot,
       getEntity,
       callService,
+      sendCommand,
       connectWithConfig,
       disconnect,
       clearConfig,

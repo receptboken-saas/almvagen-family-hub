@@ -18,11 +18,12 @@ import { LoginScreen } from "@/components/auth/LoginScreen";
 import { Header } from "@/components/layout/Header";
 import { ViewTabs } from "@/components/layout/ViewTabs";
 import { EnergyOverview } from "@/components/energy/EnergyOverview";
-import { EnergyGauge } from "@/components/energy/EnergyGauge";
+import { EnergyDashboard } from "@/components/energy/EnergyDashboard";
 import { QuickScenes } from "@/components/energy/QuickScenes";
 import { FamilyBoard } from "@/components/family/FamilyBoard";
 import { FamilyCalendarCard } from "@/components/family/FamilyCalendarCard";
 import { DinnerPlannerCard } from "@/components/family/DinnerPlannerCard";
+import { HappeningTodayCard } from "@/components/family/HappeningTodayCard";
 import { ThisWeekCard } from "@/components/family/ThisWeekCard";
 import { WasteScheduleCard } from "@/components/family/WasteScheduleCard";
 import { AskHouseCard } from "@/components/family/AskHouseCard";
@@ -156,13 +157,10 @@ export default function HomePage() {
   const childSingleRoom =
     isChild && visibleRooms.length === 1 ? visibleRooms[0] : null;
 
-  const hasEnergyGaugeWidget = useMemo(
-    () =>
-      propertyWidgets.some(
-        (w) => w.widget_category === "energy" && (isAdmin || !w.admin_only),
-      ),
-    [propertyWidgets, isAdmin],
-  );
+  const propertyRooms = useMemo(() => {
+    const floorIds = new Set(propertyFloors.map((f) => f.id));
+    return data.rooms.filter((r) => floorIds.has(r.floor_id));
+  }, [data.rooms, propertyFloors]);
 
   if (authLoading) {
     return (
@@ -338,6 +336,13 @@ export default function HomePage() {
                   onDataChanged={refetch}
                 />
               )}
+              <DinnerPlannerCard
+                propertyId={activeProperty?.id ?? null}
+                dinnerPlans={data.dinnerPlans}
+                onDataChanged={refetch}
+                canEdit={false}
+                compact
+              />
             </div>
           ) : activeView === "family" && !isChild ? (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
@@ -391,55 +396,31 @@ export default function HomePage() {
                   propertyId={activeProperty?.id ?? null}
                   dinnerPlans={data.dinnerPlans}
                   onDataChanged={refetch}
-                  canEdit={true}
+                  canEdit={isAdmin}
                 />
                 <FamilyCalendarCard
                   propertyId={activeProperty?.id ?? null}
-                  userId={user.id}
                   authorName={
                     profile?.display_name || user.email || "Familjemedlem"
                   }
                   isAdmin={isAdmin}
+                  weeklyEvents={data.weeklyEvents}
+                  onDataChanged={refetch}
                 />
               </div>
             </div>
           ) : activeView === "energy" && !isChild ? (
             <div className="space-y-6">
-              <section aria-labelledby="energy-deep-heading" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2
-                    id="energy-deep-heading"
-                    className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
-                  >
-                    Energi, Laddning &amp; Klimat
-                  </h2>
-                  <span className="text-xs text-[var(--text-secondary)]">
-                    Realtidsdata via HA
-                  </span>
-                </div>
-
-                <div
-                  className={`grid grid-cols-1 gap-4 ${
-                    hasEnergyGaugeWidget ? "lg:grid-cols-12" : ""
-                  }`}
-                >
-                  {hasEnergyGaugeWidget && (
-                    <div className="lg:col-span-4">
-                      <EnergyGauge
-                        widgets={propertyWidgets}
-                        isAdmin={isAdmin}
-                      />
-                    </div>
-                  )}
-                  <div className={hasEnergyGaugeWidget ? "lg:col-span-8" : ""}>
-                    <EnergyOverview
-                      widgets={propertyWidgets}
-                      isAdmin={isAdmin}
-                      onOpenAdmin={() => setIsAdminOpen(true)}
-                    />
-                  </div>
-                </div>
-              </section>
+              <EnergyDashboard
+                propertyId={activeProperty?.id ?? null}
+                propertyName={activeProperty?.name ?? "Hemmet"}
+                floors={propertyFloors}
+                rooms={propertyRooms}
+                roomDevices={data.roomDevices}
+                widgets={propertyWidgets}
+                isAdmin={isAdmin}
+                onOpenAdmin={() => setIsAdminOpen(true)}
+              />
 
               {showScenes && (
                 <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
@@ -469,7 +450,16 @@ export default function HomePage() {
                     propertyId={activeProperty?.id ?? null}
                     dinnerPlans={data.dinnerPlans}
                     onDataChanged={refetch}
-                    canEdit={true}
+                    canEdit={isAdmin}
+                  />
+                )}
+                {isChild && (
+                  <DinnerPlannerCard
+                    propertyId={activeProperty?.id ?? null}
+                    dinnerPlans={data.dinnerPlans}
+                    onDataChanged={refetch}
+                    canEdit={false}
+                    compact
                   />
                 )}
                 {showFamilyBoard && (
@@ -526,8 +516,8 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Wall Tablet / Desktop (>= 1024px): Compact House Pulse + QuickScenes row */}
-              {(showEnergy || showScenes) && (
+              {/* Wall Tablet / Desktop (>= 1024px): Compact House Pulse + QuickScenes + Händer idag */}
+              {(showEnergy || showScenes || !isChild) && (
                 <div className="hidden space-y-4 lg:block">
                   {showEnergy && (
                     <EnergyOverview
@@ -540,6 +530,53 @@ export default function HomePage() {
                   {showScenes && (
                     <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
                   )}
+                  {!isChild && (
+                    <HappeningTodayCard
+                      propertyId={activeProperty?.id ?? null}
+                      dinnerPlans={data.dinnerPlans}
+                      weeklyEvents={data.weeklyEvents}
+                      householdSettings={
+                        data.householdSettings.find(
+                          (s) => s.property_id === activeProperty?.id,
+                        ) ?? null
+                      }
+                      isAdmin={isAdmin}
+                      onDataChanged={refetch}
+                      onSelectFamilyView={() => setActiveView("family")}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Fold / Mini-tablet (640px - 1024px): Händer idag */}
+              {!isChild && (
+                <div className="hidden sm:block lg:hidden">
+                  <HappeningTodayCard
+                    propertyId={activeProperty?.id ?? null}
+                    dinnerPlans={data.dinnerPlans}
+                    weeklyEvents={data.weeklyEvents}
+                    householdSettings={
+                      data.householdSettings.find(
+                        (s) => s.property_id === activeProperty?.id,
+                      ) ?? null
+                    }
+                    isAdmin={isAdmin}
+                    onDataChanged={refetch}
+                    onSelectFamilyView={() => setActiveView("family")}
+                  />
+                </div>
+              )}
+
+              {/* Multi-room child (>= 640px): Read-only dinner widget */}
+              {isChild && (
+                <div className="hidden sm:block">
+                  <DinnerPlannerCard
+                    propertyId={activeProperty?.id ?? null}
+                    dinnerPlans={data.dinnerPlans}
+                    onDataChanged={refetch}
+                    canEdit={false}
+                    compact
+                  />
                 </div>
               )}
 

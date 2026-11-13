@@ -36,6 +36,7 @@ export function getCurrentWeekBounds(): {
   todayStr: string;
   mondayStr: string;
   sundayStr: string;
+  nextSundayStr: string;
 } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -48,10 +49,14 @@ export function getCurrentWeekBounds(): {
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
 
+  const nextSunday = new Date(monday);
+  nextSunday.setDate(monday.getDate() + 13);
+
   return {
     todayStr: toLocalISODate(today),
     mondayStr: toLocalISODate(monday),
     sundayStr: toLocalISODate(sunday),
+    nextSundayStr: toLocalISODate(nextSunday),
   };
 }
 
@@ -71,7 +76,7 @@ export function useHomeData(userId: string | undefined) {
     setIsLoading(true);
     setError(null);
 
-    const { todayStr, mondayStr, sundayStr } = getCurrentWeekBounds();
+    const { todayStr, mondayStr, nextSundayStr } = getCurrentWeekBounds();
 
     try {
       const [
@@ -126,7 +131,7 @@ export function useHomeData(userId: string | undefined) {
             "id, property_id, meal_date, dish_name, recipe_url, notes, updated_at",
           )
           .gte("meal_date", mondayStr)
-          .lte("meal_date", sundayStr)
+          .lte("meal_date", nextSundayStr)
           .order("meal_date", { ascending: true }),
       ]);
 

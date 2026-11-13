@@ -373,6 +373,21 @@ class HAWebSocketClient {
     service: string,
     serviceData?: Record<string, unknown>,
   ): Promise<unknown> {
+    return this.sendCommand("call_service", {
+      domain,
+      service,
+      ...(serviceData ? { service_data: serviceData } : {}),
+    });
+  }
+
+  /**
+   * Sends an arbitrary authenticated WebSocket command to Home Assistant
+   * (e.g. `recorder/statistics_during_period` or `history/history_during_period`).
+   */
+  public sendCommand<T = unknown>(
+    type: string,
+    payload?: Record<string, unknown>,
+  ): Promise<T> {
     if (this.status !== "connected" || !this.socket) {
       return Promise.reject(
         new Error("Inte ansluten till Home Assistant."),
@@ -380,15 +395,16 @@ class HAWebSocketClient {
     }
 
     const id = this.nextId();
-    return new Promise((resolve, reject) => {
-      this.pendingCommands.set(id, { resolve, reject });
+    return new Promise<T>((resolve, reject) => {
+      this.pendingCommands.set(id, {
+        resolve: resolve as (value: unknown) => void,
+        reject,
+      });
       try {
         this.sendJson({
           id,
-          type: "call_service",
-          domain,
-          service,
-          ...(serviceData ? { service_data: serviceData } : {}),
+          type,
+          ...(payload ?? {}),
         });
       } catch (err) {
         this.pendingCommands.delete(id);
