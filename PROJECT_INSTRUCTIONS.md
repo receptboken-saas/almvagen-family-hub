@@ -11,10 +11,11 @@
 
 ---
 
-## Kärnprincip: Zero Hardcoding
+## Kärnprincip: Zero Hardcoding & 3-sekundersregeln
 - **Inga hårdkodade hus, våningar, rum eller `entity_id` får någonsin finnas i koden.**
 - All struktur och alla enheter hämtas dynamiskt från Supabase och konfigureras via appens inbyggda Admin-gränssnitt (`src/components/admin/AdminPanel.tsx`).
 - All visuell ikonografi använder `IconResolver.tsx` + `CustomIcons.tsx` baserat på ikon-ID sparat i databasen.
+- **Steg A (Progressive Disclosure):** `RoomCard.tsx` visar enbart rumsikon, namn, kompakt statusrad (temperatur + tända lampor) och snabbknappar ("Tänd alla" / "Släck alla"). Klick på kortet öppnar `RoomDetailDrawer.tsx` (slide-over på surfplatta/desktop, bottom-sheet på mobil) med alla rummets enheter, ljusstyrkereglage och brytare.
 
 ---
 

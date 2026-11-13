@@ -21,6 +21,7 @@ import { EnergyGauge } from "@/components/energy/EnergyGauge";
 import { QuickScenes } from "@/components/energy/QuickScenes";
 import { FamilyBoard } from "@/components/family/FamilyBoard";
 import { RoomCard } from "@/components/rooms/RoomCard";
+import { RoomDetailDrawer } from "@/components/rooms/RoomDetailDrawer";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Card } from "@/components/ui/Card";
 import { DynamicIcon } from "@/components/ui/IconResolver";
@@ -52,6 +53,7 @@ export default function HomePage() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     if (
@@ -218,6 +220,28 @@ export default function HomePage() {
         onClose={() => setIsSwitcherOpen(false)}
       />
 
+      <RoomDetailDrawer
+        room={
+          selectedRoomId
+            ? visibleRooms.find((r) => r.id === selectedRoomId) ?? null
+            : null
+        }
+        floorName={
+          selectedRoomId
+            ? floorNameById.get(
+                visibleRooms.find((r) => r.id === selectedRoomId)?.floor_id ??
+                  "",
+              )
+            : undefined
+        }
+        devices={
+          selectedRoomId
+            ? data.roomDevices.filter((d) => d.room_id === selectedRoomId)
+            : []
+        }
+        onClose={() => setSelectedRoomId(null)}
+      />
+
       {isAdmin && (
             <button
               type="button"
@@ -287,6 +311,28 @@ export default function HomePage() {
       <ProfileSwitcherModal
         isOpen={isSwitcherOpen}
         onClose={() => setIsSwitcherOpen(false)}
+      />
+
+      <RoomDetailDrawer
+        room={
+          selectedRoomId
+            ? visibleRooms.find((r) => r.id === selectedRoomId) ?? null
+            : null
+        }
+        floorName={
+          selectedRoomId
+            ? floorNameById.get(
+                visibleRooms.find((r) => r.id === selectedRoomId)?.floor_id ??
+                  "",
+              )
+            : undefined
+        }
+        devices={
+          selectedRoomId
+            ? data.roomDevices.filter((d) => d.room_id === selectedRoomId)
+            : []
+        }
+        onClose={() => setSelectedRoomId(null)}
       />
 
       {isAdmin && (
@@ -447,6 +493,7 @@ export default function HomePage() {
                         devices={data.roomDevices.filter(
                           (d) => d.room_id === room.id,
                         )}
+                        onSelect={() => setSelectedRoomId(room.id)}
                       />
                     ))}
                   </div>
@@ -473,6 +520,28 @@ export default function HomePage() {
       <ProfileSwitcherModal
         isOpen={isSwitcherOpen}
         onClose={() => setIsSwitcherOpen(false)}
+      />
+
+      <RoomDetailDrawer
+        room={
+          selectedRoomId
+            ? visibleRooms.find((r) => r.id === selectedRoomId) ?? null
+            : null
+        }
+        floorName={
+          selectedRoomId
+            ? floorNameById.get(
+                visibleRooms.find((r) => r.id === selectedRoomId)?.floor_id ??
+                  "",
+              )
+            : undefined
+        }
+        devices={
+          selectedRoomId
+            ? data.roomDevices.filter((d) => d.room_id === selectedRoomId)
+            : []
+        }
+        onClose={() => setSelectedRoomId(null)}
       />
 
       {isAdmin && (
