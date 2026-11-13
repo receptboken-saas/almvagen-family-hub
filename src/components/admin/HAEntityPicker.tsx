@@ -28,8 +28,37 @@ export function HAEntityPicker({
   const [isOpen, setIsOpen] = useState(false);
 
   const entityList = useMemo(() => {
-    const query = value.toLowerCase().trim();
+    const trimmed = value.trim();
+    const exactMatch = trimmed ? entities[trimmed] : undefined;
     const all = Object.values(entities);
+
+    if (exactMatch) {
+      const [selectedDomain, selectedObj = ""] = exactMatch.entity_id.split(".");
+      const selectedPrefix = selectedObj.split("_").slice(0, 2).join("_");
+
+      const rank = (entity: HAEntityState): number => {
+        if (entity.entity_id === exactMatch.entity_id) return 0;
+        const [domain, obj = ""] = entity.entity_id.split(".");
+        if (
+          domain === selectedDomain &&
+          selectedPrefix.length >= 3 &&
+          obj.startsWith(selectedPrefix)
+        ) {
+          return 1;
+        }
+        if (domain === selectedDomain) return 2;
+        return 3;
+      };
+
+      return [...all]
+        .sort((a, b) => {
+          const diff = rank(a) - rank(b);
+          return diff !== 0 ? diff : a.entity_id.localeCompare(b.entity_id);
+        })
+        .slice(0, 80);
+    }
+
+    const query = trimmed.toLowerCase();
     const filtered = query
       ? all.filter(
           (e) =>

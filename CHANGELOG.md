@@ -2,6 +2,10 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.7] – 2026-11-14 (UX-fix för HAEntityPicker & skarpare poängsättning för Tibber Pulse)
+- **Smartare rullista i `HAEntityPicker.tsx`:** När `value` redan matchar en befintlig HA-entitet filtreras inte övriga entiteter bort; istället visas alla entiteter sorterade med den valda överst följt av entiteter med samma domän/prefix (t.ex. alla `tibber_pulse`-sensorer) så man kan byta direkt utan att tömma fältet.
+- **Poängbaserad sensormatchning i `energyDiscovery.ts`:** `mainPowerEntityId` prioriterar sensorer som slutar på `_effekt` eller `_power` och straffar `_genomsnittlig_effekt`, `_minsta_` och `_hogsta_`; `mainEnergyEntityId` prioriterar `ackumulerad_forbrukning`/`accumulated_consumption` och straffar/exkluderar `maxtimme`, `peak` och `kostnad`.
+
 ## [0.18.6] – 2026-11-14 (Tariff-fallback för Gemini Edge Function & träffsäkrare Tibber Pulse-skanning)
 - **Fix & fallback för elnätstariff (`EnergyConfigModal.tsx`, `EnergyDashboard.tsx`):** Skickar med `property_id` till `gemini-hub-assistant` vid hämtning av nätavgift samt lägger till en inbyggd fallback för kända svenska nätägare (E.ON, Ellevio, Vattenfall m.fl.) om Edge Function svarar med fel eller timeout — så användaren alltid får svar direkt utan rött felmeddelande.
 - **Träffsäkrare Tibber Pulse-skanning (`energyDiscovery.ts`):** Exkluderar statistik- och aggregatsensorer (`maxtimme`, `genomsnitt`, `average`, `minsta`, `hogsta`/`högsta`) vid automatiskt val av `mainPowerEntityId` och `mainEnergyEntityId` så att riktig realtidseffekt och ackumulerad kWh alltid väljs.

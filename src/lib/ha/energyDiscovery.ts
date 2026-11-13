@@ -66,10 +66,91 @@ function isAggregateOrStatSensor(ent: HassEntity): boolean {
     t.includes("minsta") ||
     t.includes("hogsta") ||
     t.includes("högsta") ||
+    t.includes("peak") ||
+    t.includes("kostnad") ||
+    t.includes("cost") ||
     t.includes("min") ||
     t.includes("max") ||
     t.includes("avg")
   );
+}
+
+function scorePowerEntity(ent: HassEntity): number {
+  const id = ent.entity_id.toLowerCase();
+  const t = `${id} ${ent.attributes.friendly_name ?? ""}`.toLowerCase();
+  let score = 0;
+
+  if (id.endsWith("_effekt") || id.endsWith("_power")) {
+    score += 100;
+  }
+  if (
+    t.includes("_genomsnittlig_effekt") ||
+    t.includes("genomsnitt") ||
+    t.includes("average") ||
+    t.includes("_avg")
+  ) {
+    score -= 200;
+  }
+  if (
+    t.includes("_minsta_") ||
+    t.includes("minsta") ||
+    t.includes("_min_") ||
+    id.endsWith("_min")
+  ) {
+    score -= 200;
+  }
+  if (
+    t.includes("_hogsta_") ||
+    t.includes("hogsta") ||
+    t.includes("högsta") ||
+    t.includes("maxtimme") ||
+    t.includes("peak") ||
+    t.includes("_max_") ||
+    id.endsWith("_max")
+  ) {
+    score -= 200;
+  }
+  if (isAggregateOrStatSensor(ent)) {
+    score -= 50;
+  }
+  return score;
+}
+
+function scoreEnergyEntity(ent: HassEntity): number {
+  const id = ent.entity_id.toLowerCase();
+  const t = `${id} ${ent.attributes.friendly_name ?? ""}`.toLowerCase();
+  let score = 0;
+
+  if (
+    t.includes("ackumulerad_forbrukning") ||
+    t.includes("ackumulerad_förbrukning") ||
+    t.includes("accumulated_consumption")
+  ) {
+    score += 200;
+  } else if (
+    t.includes("ackumulerad") ||
+    t.includes("accumulated") ||
+    t.includes("total") ||
+    t.includes("energy") ||
+    t.includes("förbrukning") ||
+    t.includes("forbrukning") ||
+    t.includes("consumption")
+  ) {
+    score += 50;
+  }
+
+  if (
+    t.includes("maxtimme") ||
+    t.includes("peak") ||
+    t.includes("kostnad") ||
+    t.includes("cost")
+  ) {
+    score -= 300;
+  }
+  if (isAggregateOrStatSensor(ent)) {
+    score -= 100;
+  }
+  return score;
 }
 
 function isPriceEntity(ent: HassEntity): boolean {
@@ -280,21 +361,16 @@ export async function scanHomeAssistantEnergyDevices(
 
     // Pick best power & energy sensor inside the same HA device
     const realPowerEnts = powerEnts.filter((e) => !isAggregateOrStatSensor(e));
-    const bestPower = realPowerEnts[0] ?? powerEnts[0];
+    const powerPool = realPowerEnts.length > 0 ? realPowerEnts : powerEnts;
+    const bestPower = [...powerPool].sort(
+      (a, b) => scorePowerEntity(b) - scorePowerEntity(a),
+    )[0];
 
     const realEnergyEnts = energyEnts.filter((e) => !isAggregateOrStatSensor(e));
     const energyPool = realEnergyEnts.length > 0 ? realEnergyEnts : energyEnts;
-    const bestEnergy =
-      energyPool.find((e) => {
-        const t = `${e.entity_id} ${e.attributes.friendly_name ?? ""}`.toLowerCase();
-        return (
-          t.includes("ackumulerad") ||
-          t.includes("total") ||
-          t.includes("energy") ||
-          t.includes("förbrukning") ||
-          t.includes("consumption")
-        );
-      }) ?? energyPool[0];
+    const bestEnergy = [...energyPool].sort(
+      (a, b) => scoreEnergyEntity(b) - scoreEnergyEntity(a),
+    )[0];
 
     const combinedText = `${deviceName} ${haDevice?.manufacturer ?? ""} ${haDevice?.model ?? ""} ${bestPower?.entity_id ?? ""} ${bestEnergy?.entity_id ?? ""}`;
     const isMain = isMainMeterText(combinedText);
