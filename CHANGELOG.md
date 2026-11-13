@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.13.0] – 2026-11-13 ("Fråga Almvägen" & Verifierad Gemini-hjärna)
+- **Ny `"Fråga Almvägen"`-komponent (`AskHouseCard.tsx`):** Kompakt AI-kort i jordnära linne-/valnötstema med inmatningsfält, tre snabbfråge-piller (*"Vilka lampor lyser?"*, *"Hur ser veckan ut?"*, *"Vad blir det till middag?"*) och tydlig svarsruta. Döljs helt för `child`-profiler, visas fullt ut i *Familjen & Veckan* och som fällbar fråge-pill under *Hem & Styrning* på mobil/tablet (`< 1024px`).
+- **Realtidskontext (`house_context`):** Sammanställer automatiskt rums- och enhetsstatus från Home Assistant (`useHomeAssistant`), dashboard-widgets, `weekly_events` och `dinner_plans` utan hårdkodade `entity_id` och anropar `gemini-hub-assistant` (`action: 'ask_house'`).
+- **Verifierad lovdagssynk & anslagstavla (`AdminPanel.tsx`, `FamilyBoard.tsx`):** Förbättrad felåterkoppling för `sync_school_and_waste` med omedelbar `refetch` av `weekly_events`, samt tydlig varm bekräftelsetoast i `FamilyBoard.tsx` efter `parse_family_input` med realtidsuppdatering av `family_notes`, `dinner_plans` och `weekly_events`.
+
 ## [0.12.0] – 2026-11-13 (Fristående Snabb-PIN via RPC & Edge Function)
 - **Direkt Snabb-PIN utan föregående admin-inlogg (`LoginScreen.tsx`):** Startskärmen hämtar familjemedlemmar och surfplattor direkt via `supabase.rpc('get_pin_profiles')` även i oinloggat läge och visar klickbara avatar-kort med roll-badge och PIN-status (`Saknar PIN` om PIN saknas).
 - **Riktig Supabase-session via `pin-login` (`LoginScreen.tsx`):** Vid 4-siffrig PIN anropas Edge Function `pin-login` (med fallback till `bright-responder`), returnerad `token_hash` verifieras via `supabase.auth.verifyOtp({ token_hash, type: 'magiclink' })` och `active_profile_id` sparas i `localStorage`.

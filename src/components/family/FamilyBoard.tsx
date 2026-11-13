@@ -289,17 +289,18 @@ export function FamilyBoard({
               <Sparkles className="h-3.5 w-3.5 text-[#D49A42]" aria-hidden="true" />
               <span>Tolka med Gemini</span>
             </label>
-
-            {toastMessage && (
-              <span
-                role="status"
-                className="rounded-full bg-[#6B8E6B]/15 px-3 py-1 text-xs font-medium text-[#6B8E6B]"
-              >
-                {toastMessage}
-              </span>
-            )}
           </div>
         </form>
+
+        {toastMessage && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-xl border border-[#6B8E6B]/30 bg-[#6B8E6B]/12 px-3.5 py-2 text-xs font-medium text-[#6B8E6B]"
+          >
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#D49A42]" aria-hidden="true" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
 
         {notes.length === 0 ? (
           <p className="py-3 text-center text-xs text-[var(--text-secondary)]">

@@ -793,7 +793,17 @@ export function AdminPanel({
       );
 
       if (error) {
-        setSchoolSyncMsg(`Kunde inte synka: ${error.message}`);
+        let errorMsg = error.message;
+        const ctx = (error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const payload = (await ctx.clone().json()) as { error?: string };
+            if (payload.error) errorMsg = payload.error;
+          } catch {
+            // Ignore JSON parse errors
+          }
+        }
+        setSchoolSyncMsg(`Kunde inte synka: ${errorMsg}`);
       } else {
         const res = fnData as {
           message?: string;

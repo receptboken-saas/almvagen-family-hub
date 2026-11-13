@@ -25,6 +25,7 @@ import { FamilyCalendarCard } from "@/components/family/FamilyCalendarCard";
 import { DinnerPlannerCard } from "@/components/family/DinnerPlannerCard";
 import { ThisWeekCard } from "@/components/family/ThisWeekCard";
 import { WasteScheduleCard } from "@/components/family/WasteScheduleCard";
+import { AskHouseCard } from "@/components/family/AskHouseCard";
 import { RoomCard } from "@/components/rooms/RoomCard";
 import { ChildRoomView } from "@/components/rooms/ChildRoomView";
 import { RoomDetailDrawer } from "@/components/rooms/RoomDetailDrawer";
@@ -332,12 +333,23 @@ export default function HomePage() {
                     profile?.display_name || user.email || "Familjemedlem"
                   }
                   isAdmin={isAdmin}
+                  onDataChanged={refetch}
                 />
               )}
             </div>
           ) : activeView === "family" && !isChild ? (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
               <div className="space-y-6">
+                <AskHouseCard
+                  propertyId={activeProperty?.id ?? null}
+                  propertyName={activeProperty?.name}
+                  floors={propertyFloors}
+                  rooms={visibleRooms}
+                  roomDevices={data.roomDevices}
+                  widgets={propertyWidgets}
+                  weeklyEvents={data.weeklyEvents}
+                  dinnerPlans={data.dinnerPlans}
+                />
                 <ThisWeekCard
                   propertyId={activeProperty?.id ?? null}
                   weeklyEvents={data.weeklyEvents}
@@ -524,6 +536,23 @@ export default function HomePage() {
                   {showScenes && (
                     <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
                   )}
+                </div>
+              )}
+
+              {/* Mobile & Fold/Mini-tablet (< 1024px): Collapsible Fråga Almvägen pill */}
+              {!isChild && (
+                <div className="lg:hidden">
+                  <AskHouseCard
+                    propertyId={activeProperty?.id ?? null}
+                    propertyName={activeProperty?.name}
+                    floors={propertyFloors}
+                    rooms={visibleRooms}
+                    roomDevices={data.roomDevices}
+                    widgets={propertyWidgets}
+                    weeklyEvents={data.weeklyEvents}
+                    dinnerPlans={data.dinnerPlans}
+                    compactCollapsible
+                  />
                 </div>
               )}
 
