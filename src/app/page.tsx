@@ -414,6 +414,11 @@ export default function HomePage() {
               <EnergyDashboard
                 propertyId={activeProperty?.id ?? null}
                 propertyName={activeProperty?.name ?? "Hemmet"}
+                defaultMunicipality={
+                  data.householdSettings.find(
+                    (s) => s.property_id === activeProperty?.id,
+                  )?.municipality ?? null
+                }
                 floors={propertyFloors}
                 rooms={propertyRooms}
                 roomDevices={data.roomDevices}

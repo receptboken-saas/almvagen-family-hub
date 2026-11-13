@@ -26,11 +26,13 @@ import {
   type DiscoveredHADevice,
 } from "@/lib/ha/energyDiscovery";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
+import { getSupabaseClient } from "@/lib/supabase/client";
 import type { Room, RoomDevice } from "@/lib/supabase/types";
 
 interface EnergyConfigModalProps {
   isOpen: boolean;
   config: EnergyHouseholdConfig;
+  defaultMunicipality?: string | null;
   rooms: Room[];
   roomDevices: RoomDevice[];
   onClose: () => void;
@@ -40,6 +42,7 @@ interface EnergyConfigModalProps {
 export function EnergyConfigModal({
   isOpen,
   config,
+  defaultMunicipality,
   rooms,
   roomDevices,
   onClose,
@@ -62,13 +65,19 @@ export function EnergyConfigModal({
     Record<string, EnergyCategory>
   >({});
   const [bulbAppliedCount, setBulbAppliedCount] = useState<number | null>(null);
+  const [isFetchingTariff, setIsFetchingTariff] = useState(false);
+  const [tariffError, setTariffError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setDraft(config);
+      setDraft({
+        ...config,
+        municipality: config.municipality ?? defaultMunicipality ?? null,
+      });
       setBulbAppliedCount(null);
+      setTariffError(null);
     }
-  }, [isOpen, config]);
+  }, [isOpen, config, defaultMunicipality]);
 
   if (!isOpen) return null;
 
@@ -123,6 +132,82 @@ export function EnergyConfigModal({
       else next.add(haDeviceId);
       return next;
     });
+  };
+
+  const handleFetchGridTariff = async () => {
+    const op = (draft.gridOperator ?? "").trim();
+    const muni = (draft.municipality ?? "").trim();
+    if (!op && !muni) {
+      setTariffError("Ange minst elnätsleverantör eller kommun först.");
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setTariffError("Supabase-klient saknas.");
+      return;
+    }
+
+    setIsFetchingTariff(true);
+    setTariffError(null);
+
+    const prompt =
+      `Slå upp aktuell svensk elnätsavgift (överföringsavgift + svensk energiskatt inkl. moms i kr/kWh) och eventuell effekttariff-modell för elnätsleverantör "${op || "okänd (välj lokal nätägare i kommunen)"}" i "${muni || "Sverige"}" för en villa med ${draft.mainFuseAmps} A huvudsäkring. ` +
+      "Svara ENDAST med giltig JSON i exakt detta format: " +
+      '{"gridOperator": "Bekräftat bolagsnamn", "gridFeePerKwh": 1.15, "gridTariffSummary": "Kort sammanfattning på max 120 tecken om överföring, energiskatt och effekttariff"}';
+
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke<{
+        answer?: string;
+        reply?: string;
+        message?: string;
+        text?: string;
+        error?: string;
+      }>("gemini-hub-assistant", {
+        body: {
+          action: "ask_house",
+          question: prompt,
+          house_context: {
+            grid_operator: op,
+            municipality: muni,
+            main_fuse_amps: draft.mainFuseAmps,
+          },
+        },
+      });
+
+      if (invokeErr) throw invokeErr;
+      const rawText =
+        data?.answer || data?.reply || data?.message || data?.text || "";
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Kunde inte tolka svaret från Gemini.");
+      }
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        gridOperator?: string;
+        gridFeePerKwh?: number;
+        gridTariffSummary?: string;
+      };
+
+      setDraft((prev) => ({
+        ...prev,
+        gridOperator: parsed.gridOperator?.trim() || prev.gridOperator,
+        gridFeePerKwh:
+          typeof parsed.gridFeePerKwh === "number" &&
+          Number.isFinite(parsed.gridFeePerKwh)
+            ? Number(parsed.gridFeePerKwh.toFixed(2))
+            : prev.gridFeePerKwh,
+        gridTariffSummary:
+          parsed.gridTariffSummary?.trim() || prev.gridTariffSummary,
+      }));
+    } catch (err) {
+      setTariffError(
+        err instanceof Error
+          ? err.message
+          : "Kunde inte hämta nätavgift från Gemini.",
+      );
+    } finally {
+      setIsFetchingTariff(false);
+    }
   };
 
   const applyDefaultLightWatts = () => {
@@ -537,6 +622,92 @@ export function EnergyConfigModal({
                   }
                   placeholder="t.ex. sensor.tibber_elpris"
                 />
+              </div>
+
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">
+                      Elnätsleverantör &amp; Kommun
+                    </p>
+                    <p className="text-[11px] text-[var(--text-secondary)]">
+                      Hämta överföringsavgift, energiskatt och effekttariff-regler med Gemini
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleFetchGridTariff}
+                    disabled={isFetchingTariff}
+                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-[#6B8E6B] px-3.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isFetchingTariff ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    <span>
+                      {isFetchingTariff ? "Hämtar..." : "Hämta uppgifter med Gemini"}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="grid-operator-input"
+                      className="text-[11px] font-semibold text-[var(--text-secondary)]"
+                    >
+                      Elnätsleverantör
+                    </label>
+                    <input
+                      id="grid-operator-input"
+                      type="text"
+                      value={draft.gridOperator ?? ""}
+                      onChange={(e) =>
+                        setDraft((p) => ({
+                          ...p,
+                          gridOperator: e.target.value || null,
+                        }))
+                      }
+                      placeholder="t.ex. Ellevio, E.ON, Vattenfall..."
+                      className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[#6B8E6B]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="energy-municipality-input"
+                      className="text-[11px] font-semibold text-[var(--text-secondary)]"
+                    >
+                      Kommun
+                    </label>
+                    <input
+                      id="energy-municipality-input"
+                      type="text"
+                      value={draft.municipality ?? ""}
+                      onChange={(e) =>
+                        setDraft((p) => ({
+                          ...p,
+                          municipality: e.target.value || null,
+                        }))
+                      }
+                      placeholder="t.ex. Nacka, Täby, Kungsbacka..."
+                      className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[#6B8E6B]"
+                    />
+                  </div>
+                </div>
+
+                {tariffError && (
+                  <p className="text-xs font-medium text-[#C86D51]">
+                    {tariffError}
+                  </p>
+                )}
+
+                {draft.gridTariffSummary && (
+                  <p className="rounded-lg bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-primary)]">
+                    <strong>Tariff-info:</strong> {draft.gridTariffSummary}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

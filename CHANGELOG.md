@@ -2,6 +2,10 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.3] – 2026-11-13 (Elnätsleverantör & Kommun med Gemini-hämtning av nätavgift & effekttariff)
+- **Elnätsleverantör & Kommun (`energyConfig.ts`, `EnergyConfigModal.tsx`, `page.tsx`):** Lade till fält för `gridOperator`, `municipality` (förifylls automatiskt från `household_settings.municipality`) och `gridTariffSummary` samt knappen **"Hämta uppgifter med Gemini"** som slår upp och fyller i aktuell överföringsavgift + energiskatt (`kr/kWh`) samt effekttariff-modell.
+- **Skräddarsydda effekttoppar & AI-råd (`EnergyDashboard.tsx`, `EnergyGeminiAdvisor.tsx`):** Visar elnätsbolag och tariffmodell direkt i *Effekttoppar*-kortet och skickar med uppgifterna till **Gemini Energirådgivare**.
+
 ## [0.18.2] – 2026-11-13 (Träffsäkrare kategorisering & filtrering av passiva sensorer)
 - **Fix för felmatchade kategorier (`energyConfig.ts`, `energyDiscovery.ts`):** Bytte delsträngsmatchningen `"ev"` / `"bil"` mot exakta ordgränser (`\bev\b`, `elbil`, `laddbox`, `laddare`, `zaptec`, `easee`) så vanliga enheter med t.ex. *"level"* eller *"device"* inte råkar hamna under *Elbilsladdning*.
 - **Renare enhetslista (`energyEngine.ts`):** Passiva temperatur-, fukt-, rörelse- och kamerasensorer utan egen W/kWh-mätare eller märkeffekt filtreras bort från *Energi & Drift* så siffror och enhetsantal enbart speglar verkliga elförbrukare.

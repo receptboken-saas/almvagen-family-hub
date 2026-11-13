@@ -21,6 +21,9 @@ interface EnergyGeminiAdvisorProps {
   propertyId: string | null;
   propertyName: string;
   summary: EnergyDashboardSummary;
+  gridOperator?: string | null;
+  municipality?: string | null;
+  gridTariffSummary?: string | null;
 }
 
 interface GeminiResponse {
@@ -83,6 +86,9 @@ export function EnergyGeminiAdvisor({
   propertyId,
   propertyName,
   summary,
+  gridOperator,
+  municipality,
+  gridTariffSummary,
 }: EnergyGeminiAdvisorProps) {
   const [cache, setCache] = useState<EnergyAiAnalysisCache | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -105,6 +111,9 @@ export function EnergyGeminiAdvisor({
   function buildEnergyContext() {
     return {
       property_name: propertyName,
+      municipality: municipality ?? undefined,
+      grid_operator: gridOperator ?? undefined,
+      grid_tariff_summary: gridTariffSummary ?? undefined,
       period: summary.period,
       live_total_watts: Math.round(summary.liveTotalWatts),
       fuse_load_pct: summary.fuseLoadPct,

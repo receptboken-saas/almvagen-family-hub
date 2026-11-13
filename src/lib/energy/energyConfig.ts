@@ -80,6 +80,9 @@ export interface EnergyHouseholdConfig {
   mainPowerEntityId: string | null;
   mainEnergyEntityId: string | null;
   priceEntityId: string | null;
+  gridOperator: string | null;
+  municipality: string | null;
+  gridTariffSummary: string | null;
   gridFeePerKwh: number;
   mainFuseAmps: number;
   deviceOverrides: Record<string, DeviceEnergyOverride>;
@@ -98,6 +101,9 @@ export const DEFAULT_ENERGY_CONFIG: EnergyHouseholdConfig = {
   mainPowerEntityId: null,
   mainEnergyEntityId: null,
   priceEntityId: null,
+  gridOperator: null,
+  municipality: null,
+  gridTariffSummary: null,
   gridFeePerKwh: 1.1,
   mainFuseAmps: 20,
   deviceOverrides: {},

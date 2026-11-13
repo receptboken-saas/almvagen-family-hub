@@ -42,6 +42,7 @@ import { EnergyOverview } from "./EnergyOverview";
 interface EnergyDashboardProps {
   propertyId: string | null;
   propertyName: string;
+  defaultMunicipality?: string | null;
   floors: Floor[];
   rooms: Room[];
   roomDevices: RoomDevice[];
@@ -77,6 +78,7 @@ function formatWatts(w: number): string {
 export function EnergyDashboard({
   propertyId,
   propertyName,
+  defaultMunicipality,
   floors,
   rooms,
   roomDevices,
@@ -355,8 +357,15 @@ export function EnergyDashboard({
                   Effekttoppar
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                  Högsta timmarna (effekttariff-koll)
+                  {config.gridOperator
+                    ? `${config.gridOperator}${config.municipality ? ` (${config.municipality})` : ""}`
+                    : "Högsta timmarna (effekttariff-koll)"}
                 </p>
+                {config.gridTariffSummary && (
+                  <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                    {config.gridTariffSummary}
+                  </p>
+                )}
               </div>
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C86D51]/15 text-[#C86D51]">
                 <Flame className="h-5 w-5" aria-hidden="true" />
@@ -748,6 +757,9 @@ export function EnergyDashboard({
         propertyId={propertyId}
         propertyName={propertyName}
         summary={summary}
+        gridOperator={config.gridOperator}
+        municipality={config.municipality ?? defaultMunicipality}
+        gridTariffSummary={config.gridTariffSummary}
       />
 
       {/* Existing Custom Dashboard Widgets */}
@@ -761,6 +773,7 @@ export function EnergyDashboard({
       <EnergyConfigModal
         isOpen={isConfigOpen}
         config={config}
+        defaultMunicipality={defaultMunicipality}
         rooms={rooms}
         roomDevices={roomDevices}
         onClose={() => setIsConfigOpen(false)}
