@@ -21,11 +21,24 @@ const plusJakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "Almvägen Family Hub",
   description:
-    "Smart hem-hubb för belysning, klimat, energi och elbilsladdning.",
+    "Smart hem-hubb för belysning, klimat, energi och familjens anslagstavla.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Almvägen",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F6F2EC",
+  themeColor: "#1C1917",
   width: "device-width",
   initialScale: 1,
 };

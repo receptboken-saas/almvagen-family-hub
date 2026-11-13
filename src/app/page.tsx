@@ -24,7 +24,9 @@ import { RoomCard } from "@/components/rooms/RoomCard";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Card } from "@/components/ui/Card";
 import { DynamicIcon } from "@/components/ui/IconResolver";
-import { CustomSvgIcon } from "@/components/icons/CustomIcons";
+import { InstallAppBanner } from "@/components/ui/InstallAppBanner";
+import { AvatarBadge } from "@/components/ui/AvatarBadge";
+import { ProfileSetupModal } from "@/components/ui/ProfileSetupModal";
 
 export default function HomePage() {
   const {
@@ -48,6 +50,7 @@ export default function HomePage() {
   );
   const [selectedFloorId, setSelectedFloorId] = useState<string>("all");
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
     if (
@@ -121,16 +124,30 @@ export default function HomePage() {
     <main className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-7 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
       <header className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/30">
-            <CustomSvgIcon id="ui_ha_status" className="h-6 w-6" />
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsProfileOpen(true)}
+            title="Öppna Min profil"
+            className="rounded-2xl transition-transform hover:scale-105 focus:outline-none"
+          >
+            <AvatarBadge
+              avatarUrl={profile?.avatar_url}
+              avatarIcon={profile?.avatar_icon}
+              displayName={profile?.display_name || user.email}
+              sizeClass="h-12 w-12"
+            />
+          </button>
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
               {activeProperty?.name ?? "Almvägen Family Hub"}
             </h1>
-            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(true)}
+              className="mt-0.5 text-left text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
               Inloggad som{" "}
-              <span className="font-semibold text-[var(--text-primary)]">
+              <span className="font-semibold text-[var(--text-primary)] underline decoration-[var(--border-subtle)] underline-offset-4">
                 {profile?.display_name || user.email}
               </span>
               {profile?.role && (
@@ -138,7 +155,7 @@ export default function HomePage() {
                   {profile.role}
                 </span>
               )}
-            </p>
+            </button>
           </div>
         </div>
 
@@ -163,7 +180,12 @@ export default function HomePage() {
 
           <ThemeToggle />
 
-          {isAdmin && (
+          <ProfileSetupModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
+
+      {isAdmin && (
             <button
               type="button"
               onClick={() => setIsAdminOpen(true)}
@@ -198,6 +220,8 @@ export default function HomePage() {
         </div>
       </header>
 
+      <InstallAppBanner />
+
       {dataError && (
         <div className="rounded-2xl border border-[#C86D51]/40 bg-[#C86D51]/10 p-4 text-sm text-[#C86D51]">
           Kunde inte hämta data från Supabase: {dataError}
@@ -222,7 +246,12 @@ export default function HomePage() {
               ? "Databasen är tom ännu. Skapa ditt första hus, våningar, rum och koppla Home Assistant-entiteter."
               : "Inga hus eller rum har delats med ditt konto ännu. Kontakta familjens administratör."}
           </p>
-          {isAdmin && (
+          <ProfileSetupModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
+
+      {isAdmin && (
             <button
               type="button"
               onClick={() => setIsAdminOpen(true)}
@@ -391,6 +420,11 @@ export default function HomePage() {
         </span>
         <span>Almvägen Family Hub</span>
       </footer>
+
+      <ProfileSetupModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
 
       {isAdmin && (
         <AdminPanel

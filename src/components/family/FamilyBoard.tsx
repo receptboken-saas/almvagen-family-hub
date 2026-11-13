@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Check, Pin, Plus, Trash2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import type { FamilyNote } from "@/lib/supabase/types";
+import type { FamilyNote, Profile } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/Card";
+import { AvatarBadge } from "@/components/ui/AvatarBadge";
 
 interface FamilyBoardProps {
   propertyId: string | null;
@@ -39,6 +40,9 @@ export function FamilyBoard({
   isAdmin,
 }: FamilyBoardProps) {
   const [notes, setNotes] = useState<FamilyNote[]>([]);
+  const [avatarsByAuthor, setAvatarsByAuthor] = useState<
+    Record<string, Pick<Profile, "avatar_url" | "avatar_icon" | "display_name">>
+  >({});
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -49,17 +53,35 @@ export function FamilyBoard({
       return;
     }
 
-    const { data, error } = await supabase
-      .from("family_notes")
-      .select(
-        "id, property_id, author_id, author_name, content, is_pinned, is_done, created_at",
-      )
-      .eq("property_id", propertyId)
-      .order("is_pinned", { ascending: false })
-      .order("created_at", { ascending: false });
+    const [notesRes, profRes] = await Promise.all([
+      supabase
+        .from("family_notes")
+        .select(
+          "id, property_id, author_id, author_name, content, is_pinned, is_done, created_at",
+        )
+        .eq("property_id", propertyId)
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("profiles")
+        .select("id, avatar_url, avatar_icon, display_name"),
+    ]);
 
-    if (!error && data) {
-      setNotes(data as FamilyNote[]);
+    if (!notesRes.error && notesRes.data) {
+      setNotes(notesRes.data as FamilyNote[]);
+    }
+    if (!profRes.error && profRes.data) {
+      const map: Record<
+        string,
+        Pick<Profile, "avatar_url" | "avatar_icon" | "display_name">
+      > = {};
+      for (const p of profRes.data as Pick<
+        Profile,
+        "id" | "avatar_url" | "avatar_icon" | "display_name"
+      >[]) {
+        map[p.id] = p;
+      }
+      setAvatarsByAuthor(map);
     }
   }, [propertyId]);
 
@@ -194,12 +216,28 @@ export function FamilyBoard({
                   </div>
 
                   <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)]/70 pt-2 text-[11px] text-[var(--text-secondary)]">
-                    <span className="truncate">
-                      <strong className="font-semibold text-[var(--text-primary)]">
-                        {note.author_name}
-                      </strong>{" "}
-                      · {formatShortDate(note.created_at)}
-                    </span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <AvatarBadge
+                        avatarUrl={
+                          note.author_id
+                            ? avatarsByAuthor[note.author_id]?.avatar_url
+                            : null
+                        }
+                        avatarIcon={
+                          note.author_id
+                            ? avatarsByAuthor[note.author_id]?.avatar_icon
+                            : null
+                        }
+                        displayName={note.author_name}
+                        sizeClass="h-6 w-6 rounded-lg text-[10px]"
+                      />
+                      <span className="truncate">
+                        <strong className="font-semibold text-[var(--text-primary)]">
+                          {note.author_name}
+                        </strong>{" "}
+                        · {formatShortDate(note.created_at)}
+                      </span>
+                    </div>
 
                     <div className="flex items-center gap-1">
                       <button

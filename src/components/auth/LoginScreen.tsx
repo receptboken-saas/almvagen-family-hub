@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Lock, Mail, Loader2, AlertCircle, Delete, KeyRound } from "lucide-react";
 import { useAuth } from "@/lib/supabase/useAuth";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import type { Profile } from "@/lib/supabase/types";
 import { CustomSvgIcon } from "@/components/icons/CustomIcons";
 import { ThemeToggle } from "@/components/ui/ThemeProvider";
+import { AvatarBadge } from "@/components/ui/AvatarBadge";
 
 export function LoginScreen() {
   const {
@@ -25,6 +28,31 @@ export function LoginScreen() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [familyRoster, setFamilyRoster] = useState<
+    Pick<Profile, "id" | "display_name" | "avatar_url" | "avatar_icon">[]
+  >([]);
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase || !user) {
+      setFamilyRoster([]);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url, avatar_icon")
+      .order("display_name", { ascending: true })
+      .then(({ data }) => {
+        if (data) {
+          setFamilyRoster(
+            data as Pick<
+              Profile,
+              "id" | "display_name" | "avatar_url" | "avatar_icon"
+            >[],
+          );
+        }
+      });
+  }, [user]);
 
   async function handlePasswordSubmit(event: FormEvent) {
     event.preventDefault();
@@ -140,6 +168,27 @@ export function LoginScreen() {
                 Logga in med e-post &amp; lösenord första gången på denna enhet
                 för att auktorisera Snabb-PIN.
               </p>
+            )}
+
+            {user && familyRoster.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-3">
+                {familyRoster.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <AvatarBadge
+                      avatarUrl={member.avatar_url}
+                      avatarIcon={member.avatar_icon}
+                      displayName={member.display_name}
+                      sizeClass="h-10 w-10"
+                    />
+                    <span className="max-w-16 truncate text-[10px] font-medium text-[var(--text-secondary)]">
+                      {member.display_name || "Profil"}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
 
             <div className="flex justify-center gap-4">
