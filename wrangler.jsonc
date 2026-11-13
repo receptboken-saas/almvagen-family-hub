@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "almvagen-family-hub",
+  "compatibility_date": "2025-05-01",
+  "assets": {
+    "directory": "./out"
+  }
+}
