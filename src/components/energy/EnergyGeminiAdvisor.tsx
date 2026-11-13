@@ -34,6 +34,29 @@ interface GeminiResponse {
   error?: string;
 }
 
+async function extractInvokeError(err: unknown): Promise<string> {
+  if (!err || typeof err !== "object") {
+    return "Kunde inte nå Gemini-assistenten just nu.";
+  }
+  const record = err as {
+    message?: string;
+    context?: Response;
+  };
+  if (record.context && typeof record.context.json === "function") {
+    try {
+      const payload = (await record.context.clone().json()) as {
+        error?: string;
+        message?: string;
+      };
+      if (payload.error) return payload.error;
+      if (payload.message) return payload.message;
+    } catch {
+      // Ignore JSON parse errors
+    }
+  }
+  return record.message || "Kunde inte nå Gemini-assistenten just nu.";
+}
+
 function parseStructuredAdvice(
   rawText: string,
   period: EnergyDashboardSummary["period"],
@@ -110,46 +133,54 @@ export function EnergyGeminiAdvisor({
 
   function buildEnergyContext() {
     return {
-      property_name: propertyName,
-      municipality: municipality ?? undefined,
-      grid_operator: gridOperator ?? undefined,
-      grid_tariff_summary: gridTariffSummary ?? undefined,
-      period: summary.period,
-      live_total_watts: Math.round(summary.liveTotalWatts),
-      fuse_load_pct: summary.fuseLoadPct,
-      total_kwh: Number(summary.totalKwh.toFixed(2)),
-      total_cost_kr: Number(summary.totalCostKr.toFixed(1)),
-      total_price_per_kwh_kr: Number(summary.totalPricePerKwh.toFixed(2)),
-      baseload_watts: summary.baseloadWatts,
-      top_peaks_kw: summary.topPeaks.map((p) => ({
-        when: p.label,
-        kw: Number(p.kw.toFixed(2)),
-      })),
-      cheapest_windows: summary.cheapestWindows.map((w) => ({
-        hours: `${w.startHour}-${w.endHour}`,
-        tomorrow: w.isTomorrow,
-        avg_kr_per_kwh: Number(w.avgPriceKr.toFixed(2)),
-      })),
-      categories: summary.categories.map((c) => ({
-        name: c.label,
-        live_watts: Math.round(c.liveWatts),
-        kwh: Number(c.kwh.toFixed(2)),
-        cost_kr: Number(c.costKr.toFixed(1)),
-        share_pct: c.sharePct,
-        per_floor: c.floorBreakdown.map((f) => ({
-          floor: f.floorName,
-          kwh: Number(f.kwh.toFixed(2)),
-          live_watts: Math.round(f.liveWatts),
+      today: new Date().toISOString().slice(0, 10),
+      property: propertyName,
+      ha_connected: true,
+      rooms: [],
+      widgets: [],
+      weekly_events: [],
+      dinner_plans: [],
+      energy_summary: {
+        municipality: municipality ?? undefined,
+        grid_operator: gridOperator ?? undefined,
+        grid_tariff_summary: gridTariffSummary ?? undefined,
+        period: summary.period,
+        live_total_watts: Math.round(summary.liveTotalWatts),
+        fuse_load_pct: summary.fuseLoadPct,
+        total_kwh: Number(summary.totalKwh.toFixed(2)),
+        total_cost_kr: Number(summary.totalCostKr.toFixed(1)),
+        total_price_per_kwh_kr: Number(summary.totalPricePerKwh.toFixed(2)),
+        baseload_watts: summary.baseloadWatts,
+        top_peaks_kw: summary.topPeaks.map((p) => ({
+          when: p.label,
+          kw: Number(p.kw.toFixed(2)),
         })),
-      })),
-      top_devices: summary.devices.slice(0, 10).map((d) => ({
-        name: d.name,
-        room: d.roomName,
-        category: d.category,
-        live_watts: Math.round(d.liveWatts),
-        kwh: Number(d.kwh.toFixed(2)),
-        cost_kr: Number(d.costKr.toFixed(1)),
-      })),
+        cheapest_windows: summary.cheapestWindows.map((w) => ({
+          hours: `${w.startHour}-${w.endHour}`,
+          tomorrow: w.isTomorrow,
+          avg_kr_per_kwh: Number(w.avgPriceKr.toFixed(2)),
+        })),
+        categories: summary.categories.map((c) => ({
+          name: c.label,
+          live_watts: Math.round(c.liveWatts),
+          kwh: Number(c.kwh.toFixed(2)),
+          cost_kr: Number(c.costKr.toFixed(1)),
+          share_pct: c.sharePct,
+          per_floor: c.floorBreakdown.map((f) => ({
+            floor: f.floorName,
+            kwh: Number(f.kwh.toFixed(2)),
+            live_watts: Math.round(f.liveWatts),
+          })),
+        })),
+        top_devices: summary.devices.slice(0, 10).map((d) => ({
+          name: d.name,
+          room: d.roomName,
+          category: d.category,
+          live_watts: Math.round(d.liveWatts),
+          kwh: Number(d.kwh.toFixed(2)),
+          cost_kr: Number(d.costKr.toFixed(1)),
+        })),
+      },
     };
   }
 
@@ -199,11 +230,7 @@ export function EnergyGeminiAdvisor({
         await saveEnergyAiCache(propertyId, parsed);
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Kunde inte köra energianalysen just nu.",
-      );
+      setError(await extractInvokeError(err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -239,9 +266,7 @@ export function EnergyGeminiAdvisor({
       setFollowUpAnswer(ans || "Inget svar mottaget.");
       setFollowUp("");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Kunde inte skicka följdfrågan.",
-      );
+      setError(await extractInvokeError(err));
     } finally {
       setIsAskingFollowUp(false);
     }

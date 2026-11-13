@@ -55,7 +55,7 @@ const PERIOD_OPTIONS: { id: EnergyPeriod; label: string }[] = [
   { id: "now", label: "Just nu" },
   { id: "today", label: "Idag" },
   { id: "7d", label: "7 dagar" },
-  { id: "30d", label: "30 dagar" },
+  { id: "month", label: "Denna månad" },
 ];
 
 type BreakdownTab = "groups" | "rooms" | "devices";
@@ -120,6 +120,7 @@ export function EnergyDashboard({
     const main = resolveMainEnergyEntities(config, widgets, entities);
     if (main.mainPowerEntityId) ids.add(main.mainPowerEntityId);
     if (main.mainEnergyEntityId) ids.add(main.mainEnergyEntityId);
+    if (main.priceEntityId) ids.add(main.priceEntityId);
 
     for (const dev of roomDevices) {
       const ov = config.deviceOverrides[dev.id];

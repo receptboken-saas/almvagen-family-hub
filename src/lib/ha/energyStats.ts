@@ -50,8 +50,17 @@ export function getPeriodRange(period: EnergyPeriod): {
     const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     return { startTime: start, endTime: now, haPeriod: "hour" };
   }
-  const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  return { startTime: start, endTime: now, haPeriod: "hour" };
+  // "month": 1st of current month 00:00 -> now (matches Tibber "Innevarande månad")
+  const startOfMonth = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  );
+  return { startTime: startOfMonth, endTime: now, haPeriod: "hour" };
 }
 
 /**
@@ -95,15 +104,15 @@ export function sumKwhFromStatistics(
   if (!points || points.length === 0) return 0;
 
   let total = 0;
-  let hasChange = false;
+  let hasNonZeroChange = false;
   for (const pt of points) {
-    if (typeof pt.change === "number" && Number.isFinite(pt.change)) {
-      hasChange = true;
-      if (pt.change > 0) total += pt.change;
+    if (typeof pt.change === "number" && Number.isFinite(pt.change) && pt.change > 0) {
+      hasNonZeroChange = true;
+      total += pt.change;
     }
   }
 
-  if (!hasChange) {
+  if (!hasNonZeroChange) {
     const sums = points
       .map((p) => p.sum)
       .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
@@ -123,6 +132,50 @@ export function sumKwhFromStatistics(
     return total / 1000;
   }
   return total;
+}
+
+/**
+ * Computes exact cost (kr) by multiplying each hour's kWh consumption by that
+ * hour's recorded electricity price + grid fee, falling back to current price.
+ */
+export function computeHourlyWeightedCost(
+  energyPoints: HAStatisticPoint[] | undefined,
+  pricePoints: HAStatisticPoint[] | undefined,
+  fallbackPricePerKwh: number,
+  gridFeePerKwh: number,
+  energyUnit?: string | null,
+  priceUnit?: string | null,
+): number | null {
+  if (!energyPoints || energyPoints.length === 0) return null;
+  if (!pricePoints || pricePoints.length === 0) return null;
+
+  const isWh = (energyUnit ?? "").trim().toLowerCase() === "wh";
+  const isOre = (priceUnit ?? "").trim().toLowerCase().includes("öre");
+
+  const priceByHour = new Map<number, number>();
+  for (const pt of pricePoints) {
+    const raw = pt.mean ?? pt.state;
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      const kr = isOre ? raw / 100 : raw;
+      // Round timestamp to hour start for reliable matching
+      const hourKey = Math.floor(pt.start / 3600000);
+      priceByHour.set(hourKey, kr + gridFeePerKwh);
+    }
+  }
+
+  let totalCost = 0;
+  let usedHours = 0;
+  for (const pt of energyPoints) {
+    if (typeof pt.change === "number" && Number.isFinite(pt.change) && pt.change > 0) {
+      const kwh = isWh ? pt.change / 1000 : pt.change;
+      const hourKey = Math.floor(pt.start / 3600000);
+      const price = priceByHour.get(hourKey) ?? fallbackPricePerKwh;
+      totalCost += kwh * price;
+      usedHours += 1;
+    }
+  }
+
+  return usedHours > 0 ? totalCost : null;
 }
 
 /**

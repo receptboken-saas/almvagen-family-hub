@@ -9,7 +9,7 @@ export type EnergyCategory =
   | "ev_charging"
   | "other";
 
-export type EnergyPeriod = "now" | "today" | "7d" | "30d";
+export type EnergyPeriod = "now" | "today" | "7d" | "month";
 
 export interface EnergyCategoryMeta {
   id: EnergyCategory;

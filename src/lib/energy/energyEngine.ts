@@ -1,4 +1,5 @@
 import {
+  computeHourlyWeightedCost,
   estimateBaseloadWatts,
   extractTopPeaks,
   findCheapestPriceWindows,
@@ -229,6 +230,8 @@ export function computeEnergyDashboard(params: {
   const mainPowerStats = mainPowerEntityId
     ? statistics[mainPowerEntityId]
     : undefined;
+  const priceStats = priceEntityId ? statistics[priceEntityId] : undefined;
+  const priceUnit = priceEntity?.attributes.unit_of_measurement;
 
   let totalKwh = sumKwhFromStatistics(mainEnergyStats, mainEnergyUnit);
   if (totalKwh === 0 && period === "now" && liveTotalWattsRaw > 0) {
@@ -479,7 +482,21 @@ export function computeEnergyDashboard(params: {
   const effectiveTotalKwh = totalKwh > 0 ? totalKwh : measuredKwh;
   const unmeasuredKwh = Math.max(0, effectiveTotalKwh - measuredKwh);
   const unmeasuredLiveWatts = Math.max(0, liveTotalWatts - measuredLiveWatts);
-  const totalCostKr = effectiveTotalKwh * effectivePricePerKwh;
+
+  const weightedTotalCost = computeHourlyWeightedCost(
+    mainEnergyStats,
+    priceStats,
+    effectivePricePerKwh,
+    config.gridFeePerKwh ?? 0,
+    mainEnergyUnit,
+    priceUnit,
+  );
+  const totalCostKr =
+    weightedTotalCost !== null
+      ? weightedTotalCost
+      : effectiveTotalKwh * effectivePricePerKwh;
+  const effectiveAvgPricePerKwh =
+    effectiveTotalKwh > 0 ? totalCostKr / effectiveTotalKwh : effectivePricePerKwh;
 
   // Build category breakdown (including per-floor sub-breakdown!)
   const categories: CategoryEnergyBreakdown[] = ENERGY_CATEGORIES_ORDER.map(
@@ -495,7 +512,7 @@ export function computeEnergyDashboard(params: {
         kwh += unmeasuredKwh;
       }
 
-      const costKr = kwh * effectivePricePerKwh;
+      const costKr = kwh * effectiveAvgPricePerKwh;
       const sharePct =
         effectiveTotalKwh > 0
           ? Math.min(100, Math.round((kwh / effectiveTotalKwh) * 100))
@@ -553,7 +570,7 @@ export function computeEnergyDashboard(params: {
         floorName: floor.name,
         liveWatts,
         kwh,
-        costKr: kwh * effectivePricePerKwh,
+        costKr: kwh * effectiveAvgPricePerKwh,
         deviceCount: devs.length,
       };
     });

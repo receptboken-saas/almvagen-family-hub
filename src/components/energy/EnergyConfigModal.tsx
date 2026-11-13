@@ -168,6 +168,13 @@ export function EnergyConfigModal({
           action: "ask_house",
           question: prompt,
           house_context: {
+            today: new Date().toISOString().slice(0, 10),
+            property: null,
+            ha_connected: isConnected,
+            rooms: [],
+            widgets: [],
+            weekly_events: [],
+            dinner_plans: [],
             grid_operator: op,
             municipality: muni,
             main_fuse_amps: draft.mainFuseAmps,

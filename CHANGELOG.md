@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.4] – 2026-11-13 (Fix för Tibber "Denna månad", timvägd kostnad & Gemini Edge Function)
+- **"Denna månad" i stället för rullande 30 dagar (`energyConfig.ts`, `energyStats.ts`, `EnergyDashboard.tsx`):** Räknar från den 1:a i innevarande månad kl 00:00 fram till nu så att kWh-totalen matchar Tibber-appens vy för innevarande månad.
+- **Exakt timvägd kostnadsberäkning (`energyStats.ts`, `energyEngine.ts`):** Hämtar även timhistorik för elprissensorn och multiplicerar varje timmes förbrukning (`kWh`) med just den timmens spotpris + nätavgift.
+- **Fix för Gemini Edge Function 500 (`EnergyGeminiAdvisor.tsx`, `EnergyConfigModal.tsx`):** Skickar komplett `house_context`-struktur (`rooms`, `widgets`, `weekly_events`, `dinner_plans`) till `gemini-hub-assistant` och extraherar tydliga felmeddelanden vid eventuella anropsfel.
+
 ## [0.18.3] – 2026-11-13 (Elnätsleverantör & Kommun med Gemini-hämtning av nätavgift & effekttariff)
 - **Elnätsleverantör & Kommun (`energyConfig.ts`, `EnergyConfigModal.tsx`, `page.tsx`):** Lade till fält för `gridOperator`, `municipality` (förifylls automatiskt från `household_settings.municipality`) och `gridTariffSummary` samt knappen **"Hämta uppgifter med Gemini"** som slår upp och fyller i aktuell överföringsavgift + energiskatt (`kr/kWh`) samt effekttariff-modell.
 - **Skräddarsydda effekttoppar & AI-råd (`EnergyDashboard.tsx`, `EnergyGeminiAdvisor.tsx`):** Visar elnätsbolag och tariffmodell direkt i *Effekttoppar*-kortet och skickar med uppgifterna till **Gemini Energirådgivare**.
