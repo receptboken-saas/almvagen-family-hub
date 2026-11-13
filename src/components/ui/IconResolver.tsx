@@ -18,8 +18,9 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { CustomSvgIcon, isCustomIcon } from "@/components/icons/CustomIcons";
 
-const ICON_MAP: Record<string, LucideIcon> = {
+const LUCIDE_ICON_MAP: Record<string, LucideIcon> = {
   zap: Zap,
   flame: Flame,
   "plug-zap": PlugZap,
@@ -46,6 +47,9 @@ interface DynamicIconProps {
 
 export function DynamicIcon({ name, className = "h-5 w-5" }: DynamicIconProps) {
   const key = (name ?? "").toLowerCase().trim();
-  const Icon = ICON_MAP[key] ?? Home;
+  if (isCustomIcon(key)) {
+    return <CustomSvgIcon id={key} className={className} />;
+  }
+  const Icon = LUCIDE_ICON_MAP[key] ?? Home;
   return <Icon className={className} aria-hidden="true" />;
 }

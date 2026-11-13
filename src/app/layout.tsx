@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: "#0B0F17",
   width: "device-width",
   initialScale: 1,
 };
@@ -19,7 +19,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="sv" className="dark">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500/30">
+      <body className="min-h-screen bg-[#0B0F17] text-slate-100 antialiased selection:bg-[#38BDF8]/30">
         <AuthProvider>
           <HAProvider>{children}</HAProvider>
         </AuthProvider>

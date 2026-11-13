@@ -21,6 +21,7 @@ import type {
   WidgetType,
 } from "@/lib/supabase/types";
 import { HAEntityPicker } from "@/components/admin/HAEntityPicker";
+import { IconPicker } from "@/components/admin/IconPicker";
 
 type AdminTab = "properties" | "rooms" | "devices" | "widgets" | "family";
 
@@ -84,7 +85,7 @@ export function AdminPanel({
   // Room form
   const [roomFloorId, setRoomFloorId] = useState("");
   const [roomName, setRoomName] = useState("");
-  const [roomIcon, setRoomIcon] = useState("sofa");
+  const [roomIcon, setRoomIcon] = useState("room_vardagsrum");
   const [roomCommon, setRoomCommon] = useState(true);
 
   // Device form
@@ -99,7 +100,7 @@ export function AdminPanel({
   const [widgetTitle, setWidgetTitle] = useState("");
   const [widgetSubtitle, setWidgetSubtitle] = useState("");
   const [widgetUnit, setWidgetUnit] = useState("");
-  const [widgetIcon, setWidgetIcon] = useState("zap");
+  const [widgetIcon, setWidgetIcon] = useState("sys_tibber_pulse");
   const [widgetCategory, setWidgetCategory] =
     useState<WidgetCategory>("energy");
   const [widgetAdminOnly, setWidgetAdminOnly] = useState(false);
@@ -507,16 +508,7 @@ export function AdminPanel({
                   placeholder="Rumnamn (t.ex. Vardagsrum)"
                   className="min-h-11 rounded-xl border border-slate-800 bg-slate-950 px-3 text-sm text-slate-100"
                 />
-                <select
-                  value={roomIcon}
-                  onChange={(e) => setRoomIcon(e.target.value)}
-                  className="min-h-11 rounded-xl border border-slate-800 bg-slate-950 px-3 text-sm text-slate-100"
-                >
-                  {ROOM_ICONS.map((ic) => (
-                    <option key={ic} value={ic}>Ikon: {ic}</option>
-                  ))}
-                </select>
-                <label className="flex min-h-11 items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-950 px-3 text-sm text-slate-200">
+                <label className="flex min-h-11 items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-950 px-3 text-sm text-slate-200 sm:col-span-2">
                   <input
                     type="checkbox"
                     checked={roomCommon}
@@ -525,6 +517,14 @@ export function AdminPanel({
                   />
                   <span>Gemensamt utrymme (visas på väggplatta)</span>
                 </label>
+                <div className="sm:col-span-2">
+                  <IconPicker
+                    value={roomIcon}
+                    onChange={setRoomIcon}
+                    filterGroups={["Rum & Ytor", "Klimat & Styrning"]}
+                    label="Välj rumsikon"
+                  />
+                </div>
                 <button
                   type="submit"
                   disabled={busy || data.floors.length === 0}
@@ -725,15 +725,13 @@ export function AdminPanel({
                   placeholder="Enhet (t.ex. W, °C, öre/kWh)"
                   className="min-h-11 rounded-xl border border-slate-800 bg-slate-950 px-3 text-sm text-slate-100"
                 />
-                <select
-                  value={widgetIcon}
-                  onChange={(e) => setWidgetIcon(e.target.value)}
-                  className="min-h-11 rounded-xl border border-slate-800 bg-slate-950 px-3 text-sm text-slate-100"
-                >
-                  {WIDGET_ICONS.map((ic) => (
-                    <option key={ic} value={ic}>Ikon: {ic}</option>
-                  ))}
-                </select>
+                <div className="sm:col-span-2">
+                  <IconPicker
+                    value={widgetIcon}
+                    onChange={setWidgetIcon}
+                    label="Välj widget-ikon"
+                  />
+                </div>
                 <label className="flex min-h-11 items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-950 px-3 text-sm text-slate-200 sm:col-span-2">
                   <input
                     type="checkbox"
