@@ -260,11 +260,20 @@ export function computeEnergyDashboard(params: {
         ? dev.ha_entity_id
         : null);
 
+    const ratedWatts = override?.ratedWatts ?? null;
+
+    // Skip passive sensors/cameras (temp, humidity, motion, etc.) that have no power/energy meter or ratedWatts
+    const isPassiveNonEnergy =
+      (dev.widget_type === "sensor" || dev.widget_type === "camera") &&
+      !powerEntityId &&
+      !energyEntityId &&
+      !ratedWatts;
+    if (isPassiveNonEnergy) continue;
+
     const powerEntity = powerEntityId ? entities[powerEntityId] : undefined;
     const energyEntity = energyEntityId ? entities[energyEntityId] : undefined;
 
     const measuredWatts = parseEntityWatts(powerEntity);
-    const ratedWatts = override?.ratedWatts ?? null;
     let liveWatts = 0;
     let source: MeasurementSource = "none";
 

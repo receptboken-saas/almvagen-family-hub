@@ -76,10 +76,11 @@ function inferCategoryFromText(text: string): EnergyCategory {
     t.includes("zaptec") ||
     t.includes("easee") ||
     t.includes("wallbox") ||
-    t.includes("charge") ||
-    t.includes("ladd") ||
-    t.includes("ev ") ||
-    t.includes("_ev_")
+    t.includes("elbil") ||
+    t.includes("laddbox") ||
+    t.includes("laddare") ||
+    /\bev\b/.test(t) ||
+    /\bcharger\b/.test(t)
   ) {
     return "ev_charging";
   }

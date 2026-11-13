@@ -2,6 +2,10 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.2] – 2026-11-13 (Träffsäkrare kategorisering & filtrering av passiva sensorer)
+- **Fix för felmatchade kategorier (`energyConfig.ts`, `energyDiscovery.ts`):** Bytte delsträngsmatchningen `"ev"` / `"bil"` mot exakta ordgränser (`\bev\b`, `elbil`, `laddbox`, `laddare`, `zaptec`, `easee`) så vanliga enheter med t.ex. *"level"* eller *"device"* inte råkar hamna under *Elbilsladdning*.
+- **Renare enhetslista (`energyEngine.ts`):** Passiva temperatur-, fukt-, rörelse- och kamerasensorer utan egen W/kWh-mätare eller märkeffekt filtreras bort från *Energi & Drift* så siffror och enhetsantal enbart speglar verkliga elförbrukare.
+
 ## [0.18.1] – 2026-11-13 (1-klicks "Skanna Home Assistant" för Energi & Drift)
 - **Automatisk enhetsupptäckt (`energyDiscovery.ts`):** Läser HA:s `device_registry`, `entity_registry` och `area_registry` via WebSocket och grupperar automatiskt varje pryls effekt- (`W`), energi- (`kWh`), pris- och driftstatus-sensorer (t.ex. *"Laddar"*, *"Värmer"*, *"Tvättar"*).
 - **1-klicks konfiguration (`EnergyConfigModal.tsx`, `energyConfig.ts`, `energyEngine.ts`, `EnergyDashboard.tsx`):** Ny flik *"✨ Smart Skanna HA"* där Admin kan skanna och aktivera upptäckta prylar (även om de inte ligger i ett rum i Supabase) samt sätta schablon (9 W) på alla lampor utan elmätare med ett klick.

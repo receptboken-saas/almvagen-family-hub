@@ -297,11 +297,14 @@ export function inferDeviceCategory(
 
   const text = `${device.display_name} ${device.ha_entity_id}`.toLowerCase();
   if (
-    text.includes("ladd") ||
+    text.includes("elbil") ||
+    text.includes("laddbox") ||
+    text.includes("laddare") ||
     text.includes("zaptec") ||
     text.includes("easee") ||
-    text.includes("ev") ||
-    text.includes("bil")
+    text.includes("wallbox") ||
+    /\bev\b/.test(text) ||
+    /\bcharger\b/.test(text)
   ) {
     return "ev_charging";
   }
