@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   Shield,
+  Sparkles,
   Trash2,
   Users,
   X,
@@ -165,6 +166,21 @@ export function AdminPanel({
   );
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [editingDefaultView, setEditingDefaultView] = useState<HubViewId>("home");
+  const [syncingSchoolId, setSyncingSchoolId] = useState<string | null>(null);
+  const [schoolSyncMsg, setSchoolSyncMsg] = useState<string | null>(null);
+
+  // Household settings (municipality + optional HA waste sensor)
+  const effectivePropertyId = activePropertyId ?? data.properties[0]?.id ?? "";
+  const [householdMunicipality, setHouseholdMunicipality] = useState("");
+  const [wasteHaEntityId, setWasteHaEntityId] = useState("");
+
+  useEffect(() => {
+    const current = data.householdSettings.find(
+      (s) => s.property_id === effectivePropertyId,
+    );
+    setHouseholdMunicipality(current?.municipality ?? "");
+    setWasteHaEntityId(current?.waste_ha_entity_id ?? "");
+  }, [data.householdSettings, effectivePropertyId]);
 
   useEffect(() => {
     const defaultProp = activePropertyId ?? data.properties[0]?.id ?? "";
@@ -695,6 +711,8 @@ export function AdminPanel({
         show_scenes: editingProfile.show_scenes,
         show_family_board: editingProfile.show_family_board,
         default_floor_id: editingProfile.default_floor_id || null,
+        school_name: editingProfile.school_name?.trim() || null,
+        municipality: editingProfile.municipality?.trim() || null,
       })
       .eq("id", editingProfile.id);
 
@@ -711,6 +729,93 @@ export function AdminPanel({
       await onDataChanged();
     }
     setBusy(false);
+  }
+
+  async function handleSaveHouseholdSettings(e: FormEvent) {
+    e.preventDefault();
+    const supabase = getSupabaseClient();
+    if (!supabase || !effectivePropertyId) return;
+
+    setBusy(true);
+    setFeedback(null);
+    const { error } = await supabase.from("household_settings").upsert(
+      {
+        property_id: effectivePropertyId,
+        municipality: householdMunicipality.trim() || null,
+        waste_ha_entity_id: wasteHaEntityId.trim() || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "property_id" },
+    );
+    if (error) {
+      setFeedback(`Kunde inte spara hushållsinställningar: ${error.message}`);
+    } else {
+      setFeedback("Hushållsinställningar sparade.");
+      await onDataChanged();
+    }
+    setBusy(false);
+  }
+
+  async function handleSyncSchoolWithGemini(draft: Profile) {
+    const supabase = getSupabaseClient();
+    if (!supabase || !effectivePropertyId) return;
+
+    setSyncingSchoolId(draft.id);
+    setSchoolSyncMsg(null);
+    setFeedback(null);
+
+    try {
+      await supabase
+        .from("profiles")
+        .update({
+          school_name: draft.school_name?.trim() || null,
+          municipality: draft.municipality?.trim() || null,
+        })
+        .eq("id", draft.id);
+
+      const { data: fnData, error } = await supabase.functions.invoke(
+        "gemini-hub-assistant",
+        {
+          body: {
+            action: "sync_school_and_waste",
+            property_id: effectivePropertyId,
+            payload: {
+              profile_id: draft.id,
+              child_name: draft.display_name,
+              school_name: draft.school_name?.trim() || null,
+              municipality:
+                draft.municipality?.trim() ||
+                householdMunicipality.trim() ||
+                null,
+            },
+          },
+        },
+      );
+
+      if (error) {
+        setSchoolSyncMsg(`Kunde inte synka: ${error.message}`);
+      } else {
+        const res = fnData as {
+          message?: string;
+          synced_count?: number;
+          events_count?: number;
+        } | null;
+        const count = res?.synced_count ?? res?.events_count;
+        setSchoolSyncMsg(
+          res?.message ||
+            (typeof count === "number"
+              ? `${count} lovperioder synkade`
+              : "Lovdagar synkade med Gemini"),
+        );
+        await onDataChanged();
+      }
+    } catch (err) {
+      setSchoolSyncMsg(
+        err instanceof Error ? err.message : "Fel vid Gemini-synk.",
+      );
+    } finally {
+      setSyncingSchoolId(null);
+    }
   }
 
   async function handleDeleteProfile(profileId: string) {
@@ -1596,6 +1701,49 @@ export function AdminPanel({
                     </li>
                   ))}
                 </ul>
+
+                {effectivePropertyId && (
+                  <form
+                    onSubmit={handleSaveHouseholdSettings}
+                    className={`${cardClass} space-y-3`}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                      Hushållsinställningar (Kommun &amp; Sophämtning)
+                    </p>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                        Kommun
+                      </label>
+                      <input
+                        type="text"
+                        value={householdMunicipality}
+                        onChange={(e) =>
+                          setHouseholdMunicipality(e.target.value)
+                        }
+                        placeholder="T.ex. Svedala kommun"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                        Sophämtnings-sensor i HA (valfri)
+                      </label>
+                      <HAEntityPicker
+                        value={wasteHaEntityId}
+                        onChange={(id) => setWasteHaEntityId(id)}
+                        placeholder="Välj sophämtnings-sensor (t.ex. sensor.sophamtning)…"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#6B8E6B] px-4 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-45"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Spara hushållsinställningar</span>
+                    </button>
+                  </form>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -2564,6 +2712,69 @@ export function AdminPanel({
                               </select>
                             </div>
                           )}
+
+                          {/* School & Municipality + Gemini Holiday Sync */}
+                          <div className="space-y-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)]/60 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                              Skola &amp; Lovdagar (Gemini-synk)
+                            </p>
+                            <div className="grid gap-2.5 sm:grid-cols-2">
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                                  Skola
+                                </label>
+                                <input
+                                  type="text"
+                                  value={draft.school_name ?? ""}
+                                  onChange={(e) =>
+                                    setEditingProfile({
+                                      ...draft,
+                                      school_name: e.target.value,
+                                    })
+                                  }
+                                  placeholder="T.ex. Klågerupsskolan"
+                                  className={inputClass}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                                  Kommun
+                                </label>
+                                <input
+                                  type="text"
+                                  value={draft.municipality ?? ""}
+                                  onChange={(e) =>
+                                    setEditingProfile({
+                                      ...draft,
+                                      municipality: e.target.value,
+                                    })
+                                  }
+                                  placeholder="T.ex. Svedala kommun"
+                                  className={inputClass}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={syncingSchoolId === draft.id}
+                                onClick={() => handleSyncSchoolWithGemini(draft)}
+                                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#6B8E6B]/45 bg-[#6B8E6B]/15 px-3.5 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#6B8E6B]/25 disabled:opacity-50"
+                              >
+                                <Sparkles className="h-3.5 w-3.5 text-[#6B8E6B]" />
+                                <span>
+                                  {syncingSchoolId === draft.id
+                                    ? "Synkar med Gemini…"
+                                    : "Synka lovdagar med Gemini"}
+                                </span>
+                              </button>
+                              {schoolSyncMsg && (
+                                <span className="text-xs font-medium text-[#6B8E6B]">
+                                  {schoolSyncMsg}
+                                </span>
+                              )}
+                            </div>
+                          </div>
 
                           <IconPicker
                             context="avatar"

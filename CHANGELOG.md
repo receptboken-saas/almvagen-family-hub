@@ -2,6 +2,13 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.10.0] – 2026-11-13 (Skola/Kommun, Denna Vecka, Middagskort & Gemini-tolkning)
+- **Databas & Typer (`types.ts`, `useHomeData.ts`):** Lade till `school_name` och `municipality` på `Profile` samt nya typer och hämtning för `household_settings`, `weekly_events` (från idag och framåt) och `dinner_plans` (innevarande vecka mån–sön).
+- **Admin-inställningar & Gemini-synk (`AdminPanel.tsx`):** Lade till **Skola**, **Kommun** och knappen **"Synka lovdagar med Gemini"** (`gemini-hub-assistant` med `action: 'sync_school_and_waste'`) per profil, samt **Kommun** och valfri **Sophämtnings-sensor i HA** (`waste_ha_entity_id`) under *Hus & Inställningar*.
+- **Minimalistisk `"Denna vecka"`-widget (`ThisWeekCard.tsx`):** Filtrerar `weekly_events` för innevarande vecka + aktiv HA-sophämtningssensor; döljs helt när det är 0 händelser.
+- **KISS `"Vad blir det till middag?"`-kort (`DinnerPlannerCard.tsx`):** Visar enbart *Idag* och *Imorgon* (med klickbar `recipe_url`) i standardvyn, samt utökad Mån–Sön-redigering sparad direkt i `dinner_plans`.
+- **Smart Gemini-tolkning (`FamilyBoard.tsx`):** Ny toggle *"✨ Tolka med Gemini"* (på som standard) som skickar inmatning till `gemini-hub-assistant` (`action: 'parse_family_input'`), visar bekräftelsetoast och faller tillbaka till vanlig lapp i `family_notes` vid behov.
+
 ## [0.9.0] – 2026-11-13 (Multi-funktions Rumskort, Rums-hubb & Hus-sammanfattningar)
 - **Multi-funktions `RoomCard.tsx`:** Kompakt 3-sekundersvy utan dubbel våningstext eller `"0 enheter"`-brus. Renderar enbart aktiva funktions-piller (temperatur + värmeindikator `#C86D51`, antal tända lampor `#D49A42`, öppna säkerhetssensorer, aktiv media) samt kompakta **Tänd** / **Släck**-knappar. Tomma rum visar endast `+ Koppla enheter` för `admin`.
 - **Flikindelad Rums-hubb (`RoomDetailDrawer.tsx` & `RoomDeviceControls.tsx`):** Dynamiska funktionsflikar (*Ljus & Brytare*, *Värme & Klimat* med `−` / `+` 0.5°-steg via `climate.set_temperature`, *Säkerhet & Sensorer* med senaste ändring, samt *Övrigt & Energi*) – visar enbart flikar med kopplade enheter.

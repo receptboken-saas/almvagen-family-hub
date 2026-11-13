@@ -23,6 +23,7 @@ import { QuickScenes } from "@/components/energy/QuickScenes";
 import { FamilyBoard } from "@/components/family/FamilyBoard";
 import { FamilyCalendarCard } from "@/components/family/FamilyCalendarCard";
 import { DinnerPlannerCard } from "@/components/family/DinnerPlannerCard";
+import { ThisWeekCard } from "@/components/family/ThisWeekCard";
 import { WasteScheduleCard } from "@/components/family/WasteScheduleCard";
 import { RoomCard } from "@/components/rooms/RoomCard";
 import { ChildRoomView } from "@/components/rooms/ChildRoomView";
@@ -337,6 +338,16 @@ export default function HomePage() {
           ) : activeView === "family" && !isChild ? (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
               <div className="space-y-6">
+                <ThisWeekCard
+                  propertyId={activeProperty?.id ?? null}
+                  weeklyEvents={data.weeklyEvents}
+                  householdSettings={
+                    data.householdSettings.find(
+                      (s) => s.property_id === activeProperty?.id,
+                    ) ?? null
+                  }
+                  isAdmin={isAdmin}
+                />
                 {showFamilyBoard && (
                   <FamilyBoard
                     propertyId={activeProperty?.id ?? null}
@@ -346,6 +357,7 @@ export default function HomePage() {
                     }
                     isAdmin={isAdmin}
                     singleColumnCards
+                    onDataChanged={refetch}
                   />
                 )}
                 <WasteScheduleCard
@@ -361,10 +373,8 @@ export default function HomePage() {
               <div className="space-y-6">
                 <DinnerPlannerCard
                   propertyId={activeProperty?.id ?? null}
-                  userId={user.id}
-                  authorName={
-                    profile?.display_name || user.email || "Familjemedlem"
-                  }
+                  dinnerPlans={data.dinnerPlans}
+                  onDataChanged={refetch}
                   canEdit={true}
                 />
                 <FamilyCalendarCard
@@ -421,10 +431,30 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              {/* Mobile (< 640px): QuickScenes + compact collapsible FamilyBoard (Energy pills are at the very top) */}
+              {/* Mobile (< 640px): QuickScenes + compact ThisWeek/Dinner/FamilyBoard */}
               <div className="space-y-4 sm:hidden">
                 {showScenes && (
                   <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+                )}
+                {!isChild && (
+                  <ThisWeekCard
+                    propertyId={activeProperty?.id ?? null}
+                    weeklyEvents={data.weeklyEvents}
+                    householdSettings={
+                      data.householdSettings.find(
+                        (s) => s.property_id === activeProperty?.id,
+                      ) ?? null
+                    }
+                    isAdmin={isAdmin}
+                  />
+                )}
+                {!isChild && (
+                  <DinnerPlannerCard
+                    propertyId={activeProperty?.id ?? null}
+                    dinnerPlans={data.dinnerPlans}
+                    onDataChanged={refetch}
+                    canEdit={true}
+                  />
                 )}
                 {showFamilyBoard && (
                   <FamilyBoard
@@ -434,6 +464,7 @@ export default function HomePage() {
                       profile?.display_name || user.email || "Familjemedlem"
                     }
                     isAdmin={isAdmin}
+                    onDataChanged={refetch}
                   />
                 )}
               </div>
@@ -473,6 +504,7 @@ export default function HomePage() {
                       }
                       isAdmin={isAdmin}
                       singleColumnCards
+                      onDataChanged={refetch}
                     />
                   )}
                 </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Check, ChevronDown, Pin, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Pin, Plus, Sparkles, Trash2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { isSystemFamilyNote } from "@/lib/supabase/familyMeta";
 import type { FamilyNote, Profile } from "@/lib/supabase/types";
@@ -14,6 +14,7 @@ interface FamilyBoardProps {
   authorName: string;
   isAdmin: boolean;
   singleColumnCards?: boolean;
+  onDataChanged?: () => Promise<void> | void;
 }
 
 const NOTE_ACCENTS = [
@@ -41,6 +42,7 @@ export function FamilyBoard({
   authorName,
   isAdmin,
   singleColumnCards = false,
+  onDataChanged,
 }: FamilyBoardProps) {
   const [notes, setNotes] = useState<FamilyNote[]>([]);
   const [avatarsByAuthor, setAvatarsByAuthor] = useState<
@@ -48,6 +50,8 @@ export function FamilyBoard({
   >({});
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
+  const [useGemini, setUseGemini] = useState(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [mobileShowForm, setMobileShowForm] = useState(false);
 
@@ -99,23 +103,74 @@ export function FamilyBoard({
 
   if (!propertyId) return null;
 
-  async function handleAddNote(e: FormEvent) {
-    e.preventDefault();
+  async function insertPlainNote(text: string) {
     const supabase = getSupabaseClient();
-    if (!supabase || !propertyId || !content.trim() || busy) return;
-
-    setBusy(true);
+    if (!supabase || !propertyId) return false;
     const { error } = await supabase.from("family_notes").insert({
       property_id: propertyId,
       author_id: userId,
       author_name: authorName,
-      content: content.trim(),
+      content: text,
       is_pinned: false,
       is_done: false,
     });
-    if (!error) {
+    return !error;
+  }
+
+  function showToast(msg: string) {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 5000);
+  }
+
+  async function handleAddNote(e: FormEvent) {
+    e.preventDefault();
+    const supabase = getSupabaseClient();
+    const text = content.trim();
+    if (!supabase || !propertyId || !text || busy) return;
+
+    setBusy(true);
+    setToastMessage(null);
+
+    if (useGemini) {
+      try {
+        const { data: fnData, error } = await supabase.functions.invoke(
+          "gemini-hub-assistant",
+          {
+            body: {
+              action: "parse_family_input",
+              property_id: propertyId,
+              payload: {
+                text,
+                author_id: userId,
+                author_name: authorName,
+              },
+            },
+          },
+        );
+
+        if (!error && fnData) {
+          const res = fnData as { message?: string; summary?: string };
+          setContent("");
+          await loadNotes();
+          if (onDataChanged) await onDataChanged();
+          showToast(
+            res.message || res.summary || "Tolkad och sparad med Gemini",
+          );
+          setBusy(false);
+          return;
+        }
+      } catch {
+        // Fall back to direct note insert below
+      }
+    }
+
+    const ok = await insertPlainNote(text);
+    if (ok) {
       setContent("");
       await loadNotes();
+      showToast("Sparade lapp på anslagstavlan");
     }
     setBusy(false);
   }
@@ -203,23 +258,47 @@ export function FamilyBoard({
           onSubmit={handleAddNote}
           className={`${
             mobileShowForm ? "flex" : "hidden sm:flex"
-          } flex-col gap-2.5 sm:flex-row`}
+          } flex-col gap-2.5`}
         >
-          <input
-            type="text"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Skriv en lapp eller kom-ihåg (t.ex. Träning kl 17:30, Köp mjölk)…"
-            className="min-h-11 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none sm:min-h-12"
-          />
-          <button
-            type="submit"
-            disabled={busy || !content.trim()}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#6B8E6B] px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-12"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Sätt upp lapp</span>
-          </button>
+          <div className="flex flex-col gap-2.5 sm:flex-row">
+            <input
+              type="text"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Skriv en lapp, middag eller händelse (t.ex. Tacos imorgon, Träning kl 17)…"
+              className="min-h-11 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none sm:min-h-12"
+            />
+            <button
+              type="submit"
+              disabled={busy || !content.trim()}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#6B8E6B] px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-12"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{busy ? "Sparar…" : "Lägg till"}</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
+              <input
+                type="checkbox"
+                checked={useGemini}
+                onChange={(e) => setUseGemini(e.target.checked)}
+                className="h-3.5 w-3.5 accent-[#6B8E6B]"
+              />
+              <Sparkles className="h-3.5 w-3.5 text-[#D49A42]" aria-hidden="true" />
+              <span>Tolka med Gemini</span>
+            </label>
+
+            {toastMessage && (
+              <span
+                role="status"
+                className="rounded-full bg-[#6B8E6B]/15 px-3 py-1 text-xs font-medium text-[#6B8E6B]"
+              >
+                {toastMessage}
+              </span>
+            )}
+          </div>
         </form>
 
         {notes.length === 0 ? (

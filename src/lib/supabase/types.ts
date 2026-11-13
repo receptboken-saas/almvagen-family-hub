@@ -29,10 +29,50 @@ export interface Profile {
   quick_pin: string | null;
   avatar_icon: string | null;
   email: string | null;
+  school_name: string | null;
+  municipality: string | null;
 }
 
 export const PROFILE_SELECT_COLUMNS =
-  "id, display_name, avatar_url, role, allowed_room_ids, allowed_widget_ids, show_energy, show_scenes, show_family_board, default_floor_id, quick_pin, avatar_icon, email";
+  "id, display_name, avatar_url, role, allowed_room_ids, allowed_widget_ids, show_energy, show_scenes, show_family_board, default_floor_id, quick_pin, avatar_icon, email, school_name, municipality";
+
+export interface HouseholdSettings {
+  property_id: string;
+  municipality: string | null;
+  address_area: string | null;
+  waste_ha_entity_id: string | null;
+  last_ai_sync_at: string | null;
+  updated_at: string;
+}
+
+export type WeeklyEventCategory =
+  | "school_off"
+  | "waste"
+  | "calendar"
+  | "reminder";
+
+export interface WeeklyEvent {
+  id: string;
+  property_id: string;
+  profile_id: string | null;
+  category: WeeklyEventCategory;
+  title: string;
+  subtitle: string | null;
+  start_date: string;
+  end_date: string;
+  source: string | null;
+  created_at: string;
+}
+
+export interface DinnerPlan {
+  id: string;
+  property_id: string;
+  meal_date: string;
+  dish_name: string;
+  recipe_url: string | null;
+  notes: string | null;
+  updated_at: string;
+}
 
 export interface FamilyNote {
   id: string;
@@ -97,4 +137,7 @@ export interface HomeDataState {
   rooms: Room[];
   roomDevices: RoomDevice[];
   dashboardWidgets: DashboardWidget[];
+  householdSettings: HouseholdSettings[];
+  weeklyEvents: WeeklyEvent[];
+  dinnerPlans: DinnerPlan[];
 }
