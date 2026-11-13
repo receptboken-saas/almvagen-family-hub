@@ -6,37 +6,59 @@ import {
   CUSTOM_ICON_LIST,
   CustomSvgIcon,
   type CustomIconGroup,
+  type CustomIconMeta,
 } from "@/components/icons/CustomIcons";
 
+export type IconPickerContext = "avatar" | "room" | "device" | "widget";
+
 interface IconPickerProps {
+  context: IconPickerContext;
   value: string;
   onChange: (iconId: string) => void;
-  filterGroups?: CustomIconGroup[];
   label?: string;
 }
 
-const GROUP_ORDER: CustomIconGroup[] = [
-  "Rum & Ytor",
-  "Belysning & Vitvaror",
-  "Klimat & Säkerhet",
-  "System & Energi",
-];
+const CONTEXT_GROUPS: Record<IconPickerContext, CustomIconGroup[]> = {
+  avatar: ["Avatar & Paneler"],
+  room: ["Rum & Ytor"],
+  device: ["Belysning & Vitvaror", "Klimat & Säkerhet"],
+  widget: ["System & Energi", "Klimat & Säkerhet", "Belysning & Vitvaror"],
+};
+
+function matchesContext(icon: CustomIconMeta, context: IconPickerContext): boolean {
+  switch (context) {
+    case "avatar":
+      return icon.id.startsWith("avatar_");
+    case "room":
+      return icon.id.startsWith("room_");
+    case "device":
+      return (
+        icon.id.startsWith("light_") ||
+        icon.id.startsWith("ctrl_") ||
+        icon.id.startsWith("dev_")
+      );
+    case "widget":
+      return (
+        icon.id.startsWith("sys_") ||
+        icon.id.startsWith("ctrl_") ||
+        icon.id.startsWith("light_") ||
+        icon.id.startsWith("dev_")
+      );
+  }
+}
 
 /**
- * Compact searchable icon selector using theme CSS variables.
+ * Context-filtered, searchable icon selector using theme CSS variables.
  */
 export function IconPicker({
+  context,
   value,
   onChange,
-  filterGroups,
   label = "Välj ikon",
 }: IconPickerProps) {
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLowerCase();
-
-  const activeGroups = filterGroups
-    ? GROUP_ORDER.filter((g) => filterGroups.includes(g))
-    : GROUP_ORDER;
+  const activeGroups = CONTEXT_GROUPS[context];
 
   return (
     <div className="space-y-2.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 p-3">
@@ -64,6 +86,7 @@ export function IconPicker({
           const groupIcons = CUSTOM_ICON_LIST.filter(
             (i) =>
               i.group === group &&
+              matchesContext(i, context) &&
               (!normalizedQuery ||
                 i.label.toLowerCase().includes(normalizedQuery) ||
                 i.id.toLowerCase().includes(normalizedQuery)),
@@ -71,9 +94,11 @@ export function IconPicker({
           if (groupIcons.length === 0) return null;
           return (
             <div key={group} className="space-y-1.5">
-              <p className="text-[11px] font-semibold text-[var(--text-secondary)]">
-                {group}
-              </p>
+              {activeGroups.length > 1 && (
+                <p className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                  {group}
+                </p>
+              )}
               <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
                 {groupIcons.map((icon) => {
                   const selected = value === icon.id;

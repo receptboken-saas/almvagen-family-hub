@@ -21,6 +21,7 @@ import { EnergyGauge } from "@/components/energy/EnergyGauge";
 import { QuickScenes } from "@/components/energy/QuickScenes";
 import { FamilyBoard } from "@/components/family/FamilyBoard";
 import { RoomCard } from "@/components/rooms/RoomCard";
+import { ChildRoomView } from "@/components/rooms/ChildRoomView";
 import { RoomDetailDrawer } from "@/components/rooms/RoomDetailDrawer";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Card } from "@/components/ui/Card";
@@ -123,9 +124,12 @@ export default function HomePage() {
     });
   }, [data.dashboardWidgets, activeProperty?.id, profile]);
 
-  const showEnergy = profile?.show_energy ?? true;
-  const showScenes = profile?.show_scenes ?? true;
+  const isChild = profile?.role === "child";
+  const showEnergy = !isChild && (profile?.show_energy ?? true);
+  const showScenes = !isChild && (profile?.show_scenes ?? true);
   const showFamilyBoard = profile?.show_family_board ?? true;
+  const childSingleRoom =
+    isChild && visibleRooms.length === 1 ? visibleRooms[0] : null;
 
   const hasEnergyGaugeWidget = useMemo(
     () =>
@@ -253,7 +257,7 @@ export default function HomePage() {
             </button>
           )}
 
-          <StatusBadge />
+          {!isChild && <StatusBadge />}
 
           <button
             type="button"
@@ -348,159 +352,194 @@ export default function HomePage() {
         </Card>
       ) : (
         <>
-          {showEnergy && (
-            <section aria-labelledby="energy-heading" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2
-                  id="energy-heading"
-                  className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
-                >
-                  Översikt &amp; Energi
-                </h2>
-                <span className="text-xs text-[var(--text-secondary)]">
-                  Realtidsdata via HA
-                </span>
-              </div>
-
-              <div
-                className={`grid grid-cols-1 gap-4 ${
-                  hasEnergyGaugeWidget ? "lg:grid-cols-12" : ""
-                }`}
-              >
-                {hasEnergyGaugeWidget && (
-                  <div className="lg:col-span-4">
-                    <EnergyGauge widgets={propertyWidgets} isAdmin={isAdmin} />
-                  </div>
+          {childSingleRoom ? (
+            <div className="space-y-6">
+              <ChildRoomView
+                room={childSingleRoom}
+                floorName={floorNameById.get(childSingleRoom.floor_id)}
+                devices={data.roomDevices.filter(
+                  (d) => d.room_id === childSingleRoom.id,
                 )}
-                <div className={hasEnergyGaugeWidget ? "lg:col-span-8" : ""}>
-                  <EnergyOverview widgets={propertyWidgets} isAdmin={isAdmin} />
-                </div>
-              </div>
-            </section>
-          )}
-
-          {showScenes && (
-            <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
-          )}
-
-          {showFamilyBoard && (
-            <FamilyBoard
-              propertyId={activeProperty?.id ?? null}
-              userId={user.id}
-              authorName={profile?.display_name || user.email || "Familjemedlem"}
-              isAdmin={isAdmin}
-            />
-          )}
-
-          <section aria-labelledby="rooms-heading" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2
-                id="rooms-heading"
-                className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
-              >
-                Rum &amp; Enheter
-              </h2>
-              <span className="tabular-nums text-xs text-[var(--text-secondary)]">
-                {visibleRooms.length} rum
-              </span>
+              />
+              {showFamilyBoard && (
+                <FamilyBoard
+                  propertyId={activeProperty?.id ?? null}
+                  userId={user.id}
+                  authorName={
+                    profile?.display_name || user.email || "Familjemedlem"
+                  }
+                  isAdmin={isAdmin}
+                />
+              )}
             </div>
-
-            {propertyFloors.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
-                <button
-                  type="button"
-                  onClick={() => setSelectedFloorId("all")}
-                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
-                    selectedFloorId === "all"
-                      ? "bg-[#6B8E6B] text-white"
-                      : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
-                  }`}
-                >
-                  <Layers className="h-4 w-4" />
-                  <span>Alla våningar</span>
-                </button>
-                {propertyFloors.map((floor) => (
-                  <button
-                    key={floor.id}
-                    type="button"
-                    onClick={() => setSelectedFloorId(floor.id)}
-                    className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
-                      selectedFloorId === floor.id
-                        ? "bg-[#6B8E6B] text-white"
-                        : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    <DynamicIcon name={floor.icon ?? "layers"} className="h-4 w-4" />
-                    <span>{floor.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-              {propertyFloors.length > 0 && (
-                <aside
-                  style={{ boxShadow: "var(--card-shadow)" }}
-                  className="hidden w-56 shrink-0 flex-col gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 lg:flex"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFloorId("all")}
-                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
-                      selectedFloorId === "all"
-                        ? "bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/40"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-                    }`}
-                  >
-                    <Layers className="h-4 w-4 shrink-0" />
-                    <span className="truncate">Alla våningar</span>
-                  </button>
-                  {propertyFloors.map((floor) => (
-                    <button
-                      key={floor.id}
-                      type="button"
-                      onClick={() => setSelectedFloorId(floor.id)}
-                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
-                        selectedFloorId === floor.id
-                          ? "bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/40"
-                          : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-                      }`}
+          ) : (
+            <>
+              {showEnergy && (
+                <section aria-labelledby="energy-heading" className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2
+                      id="energy-heading"
+                      className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
                     >
-                      <DynamicIcon
-                        name={floor.icon ?? "layers"}
-                        className="h-4 w-4 shrink-0"
+                      Översikt &amp; Energi
+                    </h2>
+                    <span className="text-xs text-[var(--text-secondary)]">
+                      Realtidsdata via HA
+                    </span>
+                  </div>
+
+                  <div
+                    className={`grid grid-cols-1 gap-4 ${
+                      hasEnergyGaugeWidget ? "lg:grid-cols-12" : ""
+                    }`}
+                  >
+                    {hasEnergyGaugeWidget && (
+                      <div className="lg:col-span-4">
+                        <EnergyGauge
+                          widgets={propertyWidgets}
+                          isAdmin={isAdmin}
+                        />
+                      </div>
+                    )}
+                    <div className={hasEnergyGaugeWidget ? "lg:col-span-8" : ""}>
+                      <EnergyOverview
+                        widgets={propertyWidgets}
+                        isAdmin={isAdmin}
                       />
-                      <span className="truncate">{floor.name}</span>
-                    </button>
-                  ))}
-                </aside>
+                    </div>
+                  </div>
+                </section>
               )}
 
-              <div className="min-w-0 flex-1">
-                {visibleRooms.length === 0 ? (
-                  <Card className="border-dashed text-center text-sm text-[var(--text-secondary)]">
-                    Inga rum att visa här ännu.
-                    {isAdmin &&
-                      " Öppna 'Redigera hemmet' för att lägga till våningar och rum."}
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {visibleRooms.map((room) => (
-                      <RoomCard
-                        key={room.id}
-                        room={room}
-                        floorName={floorNameById.get(room.floor_id)}
-                        devices={data.roomDevices.filter(
-                          (d) => d.room_id === room.id,
-                        )}
-                        onSelect={() => setSelectedRoomId(room.id)}
-                      />
+              {showScenes && (
+                <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+              )}
+
+              {showFamilyBoard && (
+                <FamilyBoard
+                  propertyId={activeProperty?.id ?? null}
+                  userId={user.id}
+                  authorName={
+                    profile?.display_name || user.email || "Familjemedlem"
+                  }
+                  isAdmin={isAdmin}
+                />
+              )}
+
+              <section aria-labelledby="rooms-heading" className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2
+                    id="rooms-heading"
+                    className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
+                  >
+                    {isChild ? "Mina rum" : "Rum & Enheter"}
+                  </h2>
+                  <span className="tabular-nums text-xs text-[var(--text-secondary)]">
+                    {visibleRooms.length} rum
+                  </span>
+                </div>
+
+                {!isChild && propertyFloors.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFloorId("all")}
+                      className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+                        selectedFloorId === "all"
+                          ? "bg-[#6B8E6B] text-white"
+                          : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      <Layers className="h-4 w-4" />
+                      <span>Alla våningar</span>
+                    </button>
+                    {propertyFloors.map((floor) => (
+                      <button
+                        key={floor.id}
+                        type="button"
+                        onClick={() => setSelectedFloorId(floor.id)}
+                        className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+                          selectedFloorId === floor.id
+                            ? "bg-[#6B8E6B] text-white"
+                            : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
+                        }`}
+                      >
+                        <DynamicIcon
+                          name={floor.icon ?? "layers"}
+                          className="h-4 w-4"
+                        />
+                        <span>{floor.name}</span>
+                      </button>
                     ))}
                   </div>
                 )}
-              </div>
-            </div>
-          </section>
+
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+                  {!isChild && propertyFloors.length > 0 && (
+                    <aside
+                      style={{ boxShadow: "var(--card-shadow)" }}
+                      className="hidden w-56 shrink-0 flex-col gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 lg:flex"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFloorId("all")}
+                        className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
+                          selectedFloorId === "all"
+                            ? "bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/40"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        <Layers className="h-4 w-4 shrink-0" />
+                        <span className="truncate">Alla våningar</span>
+                      </button>
+                      {propertyFloors.map((floor) => (
+                        <button
+                          key={floor.id}
+                          type="button"
+                          onClick={() => setSelectedFloorId(floor.id)}
+                          className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
+                            selectedFloorId === floor.id
+                              ? "bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/40"
+                              : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          <DynamicIcon
+                            name={floor.icon ?? "layers"}
+                            className="h-4 w-4 shrink-0"
+                          />
+                          <span className="truncate">{floor.name}</span>
+                        </button>
+                      ))}
+                    </aside>
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    {visibleRooms.length === 0 ? (
+                      <Card className="border-dashed text-center text-sm text-[var(--text-secondary)]">
+                        Inga rum att visa här ännu.
+                        {isAdmin &&
+                          " Öppna 'Redigera hemmet' för att lägga till våningar och rum."}
+                      </Card>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {visibleRooms.map((room) => (
+                          <RoomCard
+                            key={room.id}
+                            room={room}
+                            floorName={floorNameById.get(room.floor_id)}
+                            devices={data.roomDevices.filter(
+                              (d) => d.room_id === room.id,
+                            )}
+                            onSelect={() => setSelectedRoomId(room.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
         </>
       )}
 

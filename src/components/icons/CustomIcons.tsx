@@ -37,13 +37,25 @@ export type CustomIconId =
   | "light_kontor"
   | "dev_vattenkastare"
   | "dev_utebelysning"
-  | "ui_ha_status";
+  | "ui_ha_status"
+  | "avatar_parent"
+  | "avatar_girl"
+  | "avatar_boy"
+  | "avatar_pet"
+  | "avatar_tablet"
+  | "avatar_kitchen_panel"
+  | "avatar_hall_panel"
+  | "avatar_heart"
+  | "avatar_star"
+  | "avatar_sun"
+  | "avatar_flower";
 
 export type CustomIconGroup =
   | "System & Energi"
   | "Rum & Ytor"
   | "Klimat & Säkerhet"
-  | "Belysning & Vitvaror";
+  | "Belysning & Vitvaror"
+  | "Avatar & Paneler";
 
 export interface CustomIconMeta {
   id: CustomIconId;
@@ -96,6 +108,19 @@ export const CUSTOM_ICON_LIST: CustomIconMeta[] = [
   { id: "dev_vattenkastare", label: "Vattenkastare", group: "Belysning & Vitvaror" },
   { id: "dev_utebelysning", label: "Utebelysning", group: "Belysning & Vitvaror" },
   { id: "ui_ha_status", label: "HA Status", group: "Belysning & Vitvaror" },
+
+  // Avatar & Paneler
+  { id: "avatar_parent", label: "Förälder", group: "Avatar & Paneler" },
+  { id: "avatar_girl", label: "Tjej", group: "Avatar & Paneler" },
+  { id: "avatar_boy", label: "Kille", group: "Avatar & Paneler" },
+  { id: "avatar_pet", label: "Husdjur", group: "Avatar & Paneler" },
+  { id: "avatar_tablet", label: "Väggplatta", group: "Avatar & Paneler" },
+  { id: "avatar_kitchen_panel", label: "Kökspanel", group: "Avatar & Paneler" },
+  { id: "avatar_hall_panel", label: "Hallpanel", group: "Avatar & Paneler" },
+  { id: "avatar_heart", label: "Hjärta", group: "Avatar & Paneler" },
+  { id: "avatar_star", label: "Stjärna", group: "Avatar & Paneler" },
+  { id: "avatar_sun", label: "Sol", group: "Avatar & Paneler" },
+  { id: "avatar_flower", label: "Blomma", group: "Avatar & Paneler" },
 ];
 
 const CUSTOM_ICON_SET = new Set<string>(CUSTOM_ICON_LIST.map((i) => i.id));
@@ -424,6 +449,91 @@ export function CustomSvgIcon({ id, className = "h-5 w-5", ...props }: CustomIco
         <svg {...baseProps}>
           <path d="M3 10L12 3L21 10V20H3V10Z" fill={SAGE} fillOpacity="0.18" />
           <path d="M7 14H9.5L11 11L13 17L14.5 14H17" stroke={SAGE} />
+        </svg>
+      );
+    case "avatar_parent":
+      return (
+        <svg {...baseProps}>
+          <circle cx="12" cy="8" r="4" fill={SAGE} fillOpacity="0.22" />
+          <path d="M5 20C5 16.5 8 14 12 14C16 14 19 16.5 19 20" fill={SAGE} fillOpacity="0.14" />
+        </svg>
+      );
+    case "avatar_girl":
+      return (
+        <svg {...baseProps}>
+          <circle cx="12" cy="9" r="3.8" fill={TERRACOTTA} fillOpacity="0.2" />
+          <path d="M8 9C8 6 10 4.5 12 4.5C14 4.5 16 6 16 9" stroke={TERRACOTTA} />
+          <path d="M7.5 11.5L6.5 14.5M16.5 11.5L17.5 14.5" stroke={TERRACOTTA} />
+          <path d="M6 20C6 16.8 8.7 14.5 12 14.5C15.3 14.5 18 16.8 18 20" />
+        </svg>
+      );
+    case "avatar_boy":
+      return (
+        <svg {...baseProps}>
+          <circle cx="12" cy="9" r="3.8" fill={OCHRE} fillOpacity="0.22" />
+          <path d="M8.5 7.5L12 5.5L15.5 7.5" stroke={OCHRE} />
+          <path d="M6 20C6 16.8 8.7 14.5 12 14.5C15.3 14.5 18 16.8 18 20" />
+        </svg>
+      );
+    case "avatar_pet":
+      return (
+        <svg {...baseProps}>
+          <circle cx="7" cy="9" r="1.5" fill={OCHRE} stroke={OCHRE} />
+          <circle cx="12" cy="7" r="1.5" fill={OCHRE} stroke={OCHRE} />
+          <circle cx="17" cy="9" r="1.5" fill={OCHRE} stroke={OCHRE} />
+          <path d="M8 15.5C8 13.5 9.8 12 12 12C14.2 12 16 13.5 16 15.5C16 17.5 14.5 19 12 19C9.5 19 8 17.5 8 15.5Z" fill={TERRACOTTA} fillOpacity="0.22" />
+        </svg>
+      );
+    case "avatar_tablet":
+      return (
+        <svg {...baseProps}>
+          <rect x="3" y="5" width="18" height="14" rx="2.5" fill={SAGE} fillOpacity="0.18" />
+          <path d="M7 9H13M7 13H11" stroke={SAGE} />
+          <circle cx="17" cy="12" r="1" fill="currentColor" />
+        </svg>
+      );
+    case "avatar_kitchen_panel":
+      return (
+        <svg {...baseProps}>
+          <rect x="3" y="5" width="18" height="14" rx="2.5" fill={TERRACOTTA} fillOpacity="0.16" />
+          <path d="M9 9V15M15 9V15M9 12H15" stroke={TERRACOTTA} />
+        </svg>
+      );
+    case "avatar_hall_panel":
+      return (
+        <svg {...baseProps}>
+          <rect x="3" y="5" width="18" height="14" rx="2.5" fill={OCHRE} fillOpacity="0.18" />
+          <path d="M12 8L16 11V16H8V11L12 8Z" stroke={SAGE} />
+        </svg>
+      );
+    case "avatar_heart":
+      return (
+        <svg {...baseProps}>
+          <path d="M12 20C12 20 4 14.8 4 9.2A4.2 4.2 0 0 1 12 7.2A4.2 4.2 0 0 1 20 9.2C20 14.8 12 20 12 20Z" fill={TERRACOTTA} fillOpacity="0.26" stroke={TERRACOTTA} />
+        </svg>
+      );
+    case "avatar_star":
+      return (
+        <svg {...baseProps}>
+          <path d="M12 3.5L14.6 8.8L20.5 9.6L16.2 13.8L17.2 19.6L12 16.9L6.8 19.6L7.8 13.8L3.5 9.6L9.4 8.8L12 3.5Z" fill={OCHRE} fillOpacity="0.28" stroke={OCHRE} />
+        </svg>
+      );
+    case "avatar_sun":
+      return (
+        <svg {...baseProps}>
+          <circle cx="12" cy="12" r="4.5" fill={OCHRE} fillOpacity="0.28" stroke={OCHRE} />
+          <path d="M12 3V5M12 19V21M3 12H5M19 12H21M5.6 5.6L7 7M17 17L18.4 18.4M18.4 5.6L17 7M7 17L5.6 18.4" stroke={OCHRE} />
+        </svg>
+      );
+    case "avatar_flower":
+      return (
+        <svg {...baseProps}>
+          <circle cx="12" cy="12" r="2.5" fill={OCHRE} stroke={OCHRE} />
+          <circle cx="12" cy="6.5" r="2.2" fill={SAGE} fillOpacity="0.22" />
+          <circle cx="17.2" cy="10.2" r="2.2" fill={SAGE} fillOpacity="0.22" />
+          <circle cx="15.2" cy="16.5" r="2.2" fill={SAGE} fillOpacity="0.22" />
+          <circle cx="8.8" cy="16.5" r="2.2" fill={SAGE} fillOpacity="0.22" />
+          <circle cx="6.8" cy="10.2" r="2.2" fill={SAGE} fillOpacity="0.22" />
         </svg>
       );
   }

@@ -30,10 +30,11 @@
 
 ---
 
-## Roller & Behörigheter
-- **`admin`:** Full åtkomst till alla hus, rum, admin-widgets och `AdminPanel` ("Redigera hemmet"), inklusive att skapa familjemedlemmar och skräddarsydda väggplattor utan e-postkonto.
-- **`tablet`:** Väggplatta/panel (t.ex. "Kökspanel", "Hallpanel"); anpassar synliga rum (`allowed_room_ids`), widgets (`allowed_widget_ids`), moduler (`show_energy`, `show_scenes`, `show_family_board`) och startvåning (`default_floor_id`).
-- **`child`:** Familjemedlem/barn; ser sina tilldelade rum (`allowed_room_ids`), widgets, moduler samt gemensamma ytor enligt RLS och profilinställningar.
+## Roller & Behörigheter (Steg B – Zero Noise)
+- **`admin`:** Full åtkomst till alla hus, våningar, rum, energi, widgets och `AdminPanel` ("Redigera hemmet"), inklusive att skapa familjemedlemmar och skräddarsydda väggplattor utan e-postkonto.
+- **`tablet`:** Väggplatta/panel (t.ex. "Kökspanel", "Hallpanel"); anpassar synliga rum (`allowed_room_ids` eller `is_common_area`), widgets (`allowed_widget_ids`), moduler (`show_energy`, `show_scenes`, `show_family_board`) och startvåning (`default_floor_id`).
+- **`child`:** Zero Noise-läge; döljer våningssidomeny, energimätare, widgets och systemstatus. Har barnet exakt 1 tillåtet rum öppnas `ChildRoomView.tsx` direkt med rummets styrning samt `FamilyBoard.tsx`; vid fler rum visas enbart de tilldelade rummen som rena `RoomCard`-kort.
+- **Kontextfiltrerad `IconPicker.tsx`:** Kräver `context: 'avatar' | 'room' | 'device' | 'widget'` så endast relevanta ikoner visas per sammanhang.
 - **Panel-/Profilväxlare (`ProfileSwitcherModal.tsx`):** Låter en inloggad enhet växla aktiv profil/platta (skyddad med `quick_pin` om satt) och anpassar omedelbart gränssnittet.
 
 ---

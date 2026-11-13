@@ -5,6 +5,7 @@ import { X, Upload, Check, Loader2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/supabase/useAuth";
 import { AVATAR_PRESETS, AvatarBadge } from "@/components/ui/AvatarBadge";
+import { IconPicker } from "@/components/admin/IconPicker";
 
 interface ProfileSetupModalProps {
   isOpen: boolean;
@@ -55,6 +56,9 @@ export function ProfileSetupModal({ isOpen, onClose }: ProfileSetupModalProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(
     profile?.avatar_url ?? null,
   );
+  const [avatarIcon, setAvatarIcon] = useState<string>(
+    profile?.avatar_icon ?? "avatar_parent",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +97,7 @@ export function ProfileSetupModal({ isOpen, onClose }: ProfileSetupModalProps) {
         display_name: displayName.trim() || profile.display_name,
         quick_pin: cleanPin || null,
         avatar_url: avatarUrl,
+        avatar_icon: avatarIcon || null,
       })
       .eq("id", profile.id);
 
@@ -114,7 +119,7 @@ export function ProfileSetupModal({ isOpen, onClose }: ProfileSetupModalProps) {
       aria-modal="true"
       aria-labelledby="profile-modal-title"
     >
-      <div className="w-full max-w-md rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4">
           <div>
             <h2
@@ -147,7 +152,7 @@ export function ProfileSetupModal({ isOpen, onClose }: ProfileSetupModalProps) {
           <div className="flex items-center gap-4">
             <AvatarBadge
               avatarUrl={avatarUrl}
-              avatarIcon={profile.avatar_icon}
+              avatarIcon={avatarIcon}
               displayName={displayName || profile.display_name}
               sizeClass="h-16 w-16"
             />
@@ -189,6 +194,16 @@ export function ProfileSetupModal({ isOpen, onClose }: ProfileSetupModalProps) {
               })}
             </div>
           </div>
+
+          <IconPicker
+            context="avatar"
+            value={avatarIcon}
+            onChange={(icon) => {
+              setAvatarIcon(icon);
+              setAvatarUrl(null);
+            }}
+            label="Eller välj en personlig ikon"
+          />
 
           <div>
             <label

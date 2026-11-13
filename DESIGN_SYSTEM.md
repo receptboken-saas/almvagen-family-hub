@@ -39,7 +39,7 @@ Växlas i sidhuvudet mellan **Linne** (`light`), **Valnöt** (`dark`) och **Auto
 ---
 
 ## Custom SVG Icon Pack (`src/components/icons/CustomIcons.tsx`)
-Alla 37 ikoner har mjuka, rundade linjer (`strokeWidth={2}`, `strokeLinecap="round"`, `strokeLinejoin="round"`) och duotone-fyllnad i salviagrönt, terrakotta och ockra.
+Alla 48 ikoner har mjuka, rundade linjer (`strokeWidth={2}`, `strokeLinecap="round"`, `strokeLinejoin="round"`) och duotone-fyllnad i salviagrönt, terrakotta och ockra. `IconPicker.tsx` filtrerar automatiskt ikoner utifrån `context` (`'avatar' | 'room' | 'device' | 'widget'`).
 
 ### System & Energi
 - `sys_tibber_pulse`, `sys_zaptec`, `sys_nibe`, `sys_elpris`, `sys_huvudsakring`
@@ -52,3 +52,6 @@ Alla 37 ikoner har mjuka, rundade linjer (`strokeWidth={2}`, `strokeLinecap="rou
 
 ### Belysning, Vitvaror & UI
 - `light_hue`, `light_dimmer`, `light_led`, `light_vitvaror`, `light_media`, `light_kontor`, `dev_vattenkastare`, `dev_utebelysning`, `ui_ha_status`
+
+### Avatar & Paneler
+- `avatar_parent`, `avatar_girl`, `avatar_boy`, `avatar_pet`, `avatar_tablet`, `avatar_kitchen_panel`, `avatar_hall_panel`, `avatar_heart`, `avatar_star`, `avatar_sun`, `avatar_flower`

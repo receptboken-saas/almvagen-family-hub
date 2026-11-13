@@ -142,7 +142,7 @@ export function AdminPanel({
   const [newProfileName, setNewProfileName] = useState("");
   const [newProfileRole, setNewProfileRole] = useState<ProfileRole>("tablet");
   const [newProfilePin, setNewProfilePin] = useState("");
-  const [newProfileIcon, setNewProfileIcon] = useState("room_living");
+  const [newProfileIcon, setNewProfileIcon] = useState("avatar_tablet");
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(
     null,
   );
@@ -836,9 +836,9 @@ export function AdminPanel({
                     />
                   </div>
                   <IconPicker
+                    context="room"
                     value={roomIcon}
                     onChange={setRoomIcon}
-                    filterGroups={["Rum & Ytor", "Belysning & Vitvaror"]}
                     label="Rumsikon"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1048,14 +1048,11 @@ export function AdminPanel({
                                         </div>
 
                                         <IconPicker
-                                          value={editTarget.icon ?? "room_living"}
+                                          context="room"
+                                          value={editTarget.icon ?? "room_vardagsrum"}
                                           onChange={(icon) =>
                                             setEditingRoom({ ...editTarget, icon })
                                           }
-                                          filterGroups={[
-                                            "Rum & Ytor",
-                                            "Belysning & Vitvaror",
-                                          ]}
                                           label="Rumsikon"
                                         />
 
@@ -1385,9 +1382,9 @@ export function AdminPanel({
                     className={inputClass}
                   />
                   <IconPicker
+                    context="room"
                     value={floorIcon}
                     onChange={setFloorIcon}
-                    filterGroups={["Rum & Ytor"]}
                     label="Våningsikon (valfritt)"
                   />
                   <button
@@ -1417,11 +1414,11 @@ export function AdminPanel({
                             className={inputClass}
                           />
                           <IconPicker
-                            value={editingFloor.icon ?? "layers"}
+                            context="room"
+                            value={editingFloor.icon ?? "room_entre"}
                             onChange={(icon) =>
                               setEditingFloor({ ...editingFloor, icon })
                             }
-                            filterGroups={["Rum & Ytor"]}
                             label="Välj våningsikon"
                           />
                           <div className="flex justify-end gap-2">
@@ -1805,6 +1802,7 @@ export function AdminPanel({
                 />
                 <div className="sm:col-span-2">
                   <IconPicker
+                    context="widget"
                     value={widgetIcon}
                     onChange={setWidgetIcon}
                     label="Välj widget-ikon"
@@ -1902,6 +1900,7 @@ export function AdminPanel({
                         </div>
                         <div className="sm:col-span-2">
                           <IconPicker
+                            context="widget"
                             value={editingWidget.icon ?? "sys_tibber_pulse"}
                             onChange={(icon) =>
                               setEditingWidget({ ...editingWidget, icon })
@@ -2083,6 +2082,7 @@ export function AdminPanel({
                 </div>
 
                 <IconPicker
+                  context="avatar"
                   value={newProfileIcon}
                   onChange={setNewProfileIcon}
                   label="Ikon / Avatar"
@@ -2268,7 +2268,8 @@ export function AdminPanel({
                           </div>
 
                           <IconPicker
-                            value={draft.avatar_icon ?? "room_living"}
+                            context="avatar"
+                            value={draft.avatar_icon ?? "avatar_tablet"}
                             onChange={(icon) =>
                               setEditingProfile({
                                 ...draft,
