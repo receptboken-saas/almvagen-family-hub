@@ -17,10 +17,9 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const ARC_SPAN = CIRCUMFERENCE * 0.75; // 270 degree gauge
 
 function getLoadColor(watts: number): string {
-  if (watts < 2000) return "#22C55E";
-  if (watts < 5000) return "#38BDF8";
-  if (watts < 9000) return "#F59E0B";
-  return "#EF4444";
+  if (watts < 2500) return "#6B8E6B"; // Salviagrön
+  if (watts < 6500) return "#D49A42"; // Ockra / Honungsguld
+  return "#C86D51"; // Varm Terrakotta
 }
 
 function parseNumericState(
@@ -106,7 +105,7 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
   const clampedWatts = watts !== null ? Math.max(0, Math.min(watts, MAX_WATTS)) : 0;
   const ratio = watts !== null ? clampedWatts / MAX_WATTS : 0;
   const strokeDashoffset = ARC_SPAN * (1 - ratio);
-  const arcColor = watts !== null ? getLoadColor(watts) : "#334155";
+  const arcColor = watts !== null ? getLoadColor(watts) : "var(--border-subtle)";
 
   const priceUnit =
     priceWidget?.unit ?? priceEntity?.attributes.unit_of_measurement ?? "kr/kWh";
@@ -120,19 +119,19 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
         : null;
 
   return (
-    <Card className="flex flex-col items-center justify-between gap-4 border-slate-800/90 bg-[#131A26] p-6">
+    <Card className="flex flex-col items-center justify-between gap-4 p-6">
       <div className="flex w-full items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#38BDF8]/10 text-[#38BDF8]">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#D49A42]/15 text-[#D49A42]">
             <DynamicIcon name={powerWidget.icon ?? "sys_tibber_pulse"} className="h-4 w-4" />
           </span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             {powerWidget.title}
           </span>
         </div>
         <span
-          className={`h-2 w-2 rounded-full ${
-            isConnected && watts !== null ? "bg-[#22C55E]" : "bg-slate-600"
+          className={`h-2.5 w-2.5 rounded-full ${
+            isConnected && watts !== null ? "bg-[#6B8E6B]" : "bg-[var(--border-subtle)]"
           }`}
         />
       </div>
@@ -144,7 +143,7 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
             cy="90"
             r={RADIUS}
             fill="none"
-            stroke="#1E293B"
+            stroke="var(--bg-subtle)"
             strokeWidth="12"
             strokeLinecap="round"
             strokeDasharray={`${ARC_SPAN} ${CIRCUMFERENCE}`}
@@ -164,16 +163,16 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-3xl font-bold tracking-tight text-slate-50">
+          <span className="tabular-nums text-3xl font-bold tracking-tight text-[var(--text-primary)]">
             {watts !== null ? Math.round(watts).toLocaleString("sv-SE") : "--"}
           </span>
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             Watt
           </span>
         </div>
       </div>
 
-      <div className="flex w-full flex-col items-center gap-2 border-t border-slate-800/80 pt-3">
+      <div className="flex w-full flex-col items-center gap-2 border-t border-[var(--border-subtle)] pt-3">
         {sparklinePoints ? (
           <svg viewBox="0 0 120 30" className="h-7 w-32 overflow-visible" aria-hidden="true">
             <polyline
@@ -183,19 +182,23 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
               strokeLinecap="round"
               strokeLinejoin="round"
               points={sparklinePoints}
-              opacity="0.85"
+              opacity="0.9"
             />
           </svg>
         ) : (
-          <div className="h-7 flex items-center text-[11px] text-slate-500">
+          <div className="flex h-7 items-center text-[11px] text-[var(--text-secondary)]">
             {isConnected ? "Samlar realtidsdata…" : "Väntar på Home Assistant"}
           </div>
         )}
 
         {priceText && (
-          <div className="flex items-center gap-2 rounded-full bg-[#0B0F17] px-3.5 py-1 text-xs">
-            <span className="text-slate-400">{priceWidget?.title ?? "Elpris"}:</span>
-            <span className="font-semibold text-[#22C55E]">{priceText}</span>
+          <div className="flex items-center gap-2 rounded-full bg-[var(--bg-subtle)] px-3.5 py-1 text-xs">
+            <span className="text-[var(--text-secondary)]">
+              {priceWidget?.title ?? "Elpris"}:
+            </span>
+            <span className="tabular-nums font-semibold text-[#6B8E6B]">
+              {priceText}
+            </span>
           </div>
         )}
       </div>

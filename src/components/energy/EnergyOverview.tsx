@@ -11,10 +11,10 @@ interface EnergyOverviewProps {
 }
 
 const CATEGORY_ACCENT: Record<WidgetCategory, string> = {
-  energy: "bg-[#F59E0B]/15 text-[#F59E0B]",
-  climate: "bg-[#38BDF8]/15 text-[#38BDF8]",
-  scene: "bg-[#38BDF8]/15 text-[#38BDF8]",
-  security: "bg-[#22C55E]/15 text-[#22C55E]",
+  energy: "bg-[#D49A42]/15 text-[#D49A42]",
+  climate: "bg-[#C86D51]/15 text-[#C86D51]",
+  scene: "bg-[#6B8E6B]/15 text-[#6B8E6B]",
+  security: "bg-[#6B8E6B]/15 text-[#6B8E6B]",
 };
 
 function formatWidgetValue(
@@ -36,7 +36,7 @@ export function EnergyOverview({ widgets, isAdmin }: EnergyOverviewProps) {
 
   if (visibleWidgets.length === 0) {
     return (
-      <Card className="flex items-center justify-center border-dashed border-slate-800 bg-[#131A26]/50 text-center text-sm text-slate-400">
+      <Card className="flex items-center justify-center border-dashed text-center text-sm text-[var(--text-secondary)]">
         Inga översikts-widgets konfigurerade ännu.
         {isAdmin && " Öppna 'Redigera hemmet' för att lägga till."}
       </Card>
@@ -52,12 +52,12 @@ export function EnergyOverview({ widgets, isAdmin }: EnergyOverviewProps) {
         const displayValue = formatWidgetValue(entity?.state, unit);
         const accentClass =
           CATEGORY_ACCENT[widget.widget_category] ??
-          "bg-[#38BDF8]/15 text-[#38BDF8]";
+          "bg-[#6B8E6B]/15 text-[#6B8E6B]";
 
         return (
           <Card
             key={widget.id}
-            className="flex items-center gap-4 hover:border-slate-700"
+            className="flex items-center gap-4 hover:border-[#6B8E6B]/50"
           >
             <div
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${accentClass}`}
@@ -65,14 +65,14 @@ export function EnergyOverview({ widgets, isAdmin }: EnergyOverviewProps) {
               <DynamicIcon name={widget.icon} className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium uppercase tracking-wider text-slate-400">
+              <p className="truncate text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
                 {widget.title}
               </p>
-              <p className="mt-0.5 truncate text-xl font-semibold text-slate-50">
+              <p className="tabular-nums mt-0.5 truncate text-xl font-bold text-[var(--text-primary)]">
                 {displayValue}
               </p>
               {widget.subtitle && (
-                <p className="truncate text-xs text-slate-500">
+                <p className="truncate text-xs text-[var(--text-secondary)]">
                   {widget.subtitle}
                 </p>
               )}

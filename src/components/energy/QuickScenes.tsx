@@ -59,7 +59,7 @@ export function QuickScenes({ widgets, isAdmin }: QuickScenesProps) {
       <div className="flex items-center justify-between">
         <h2
           id="scenes-heading"
-          className="text-xs font-semibold uppercase tracking-wider text-slate-400"
+          className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
         >
           Snabba scener
         </h2>
@@ -73,9 +73,10 @@ export function QuickScenes({ widgets, isAdmin }: QuickScenesProps) {
               type="button"
               disabled={!isConnected || isBusy}
               onClick={() => handleTrigger(scene)}
-              className="inline-flex min-h-12 items-center gap-3 rounded-2xl border border-slate-800/90 bg-[#131A26] px-4 py-3 text-sm font-medium text-slate-100 shadow-md transition-all hover:border-[#38BDF8]/50 hover:bg-[#38BDF8]/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ boxShadow: "var(--card-shadow)" }}
+              className="inline-flex min-h-12 items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition-all hover:border-[#6B8E6B] hover:bg-[#6B8E6B]/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#38BDF8]/15 text-[#38BDF8]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#6B8E6B]/15 text-[#6B8E6B]">
                 {isBusy ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (

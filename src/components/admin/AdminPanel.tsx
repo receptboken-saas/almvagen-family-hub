@@ -839,7 +839,7 @@ export function AdminPanel({
                   <IconPicker
                     value={roomIcon}
                     onChange={setRoomIcon}
-                    filterGroups={["Rum & Ytor", "Klimat & Styrning"]}
+                    filterGroups={["Rum & Ytor", "Klimat & Säkerhet"]}
                     label="Välj rumsikon"
                   />
                 </div>
@@ -918,7 +918,7 @@ export function AdminPanel({
                             onChange={(icon) =>
                               setEditingRoom({ ...editingRoom, icon })
                             }
-                            filterGroups={["Rum & Ytor", "Klimat & Styrning"]}
+                            filterGroups={["Rum & Ytor", "Klimat & Säkerhet"]}
                             label="Rumsikon"
                           />
                         </div>

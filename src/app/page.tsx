@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/supabase/useAuth";
 import { useHomeData } from "@/lib/supabase/useHomeData";
 import { LoginScreen } from "@/components/auth/LoginScreen";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ThemeToggle } from "@/components/ui/ThemeProvider";
 import { EnergyOverview } from "@/components/energy/EnergyOverview";
 import { EnergyGauge } from "@/components/energy/EnergyGauge";
 import { QuickScenes } from "@/components/energy/QuickScenes";
@@ -21,6 +22,7 @@ import { RoomCard } from "@/components/rooms/RoomCard";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Card } from "@/components/ui/Card";
 import { DynamicIcon } from "@/components/ui/IconResolver";
+import { CustomSvgIcon } from "@/components/icons/CustomIcons";
 
 export default function HomePage() {
   const { user, profile, isAdmin, isLoading: authLoading, signOut } = useAuth();
@@ -92,9 +94,9 @@ export default function HomePage() {
 
   if (authLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0B0F17] text-slate-300">
+      <main className="flex min-h-screen items-center justify-center text-[var(--text-secondary)]">
         <div className="flex items-center gap-3 text-sm">
-          <Loader2 className="h-5 w-5 animate-spin text-[#38BDF8]" />
+          <Loader2 className="h-5 w-5 animate-spin text-[#6B8E6B]" />
           <span>Laddar familjehubben…</span>
         </div>
       </main>
@@ -107,22 +109,22 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-7 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-      <header className="flex flex-col gap-4 border-b border-slate-800/80 pb-5 lg:flex-row lg:items-center lg:justify-between">
+      <header className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#38BDF8]/15 text-[#38BDF8] ring-1 ring-[#38BDF8]/30">
-            <Home className="h-6 w-6" aria-hidden="true" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/30">
+            <CustomSvgIcon id="ui_ha_status" className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
               {activeProperty?.name ?? "Almvägen Family Hub"}
             </h1>
-            <p className="mt-0.5 text-sm text-slate-400">
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
               Inloggad som{" "}
-              <span className="font-medium text-slate-200">
+              <span className="font-semibold text-[var(--text-primary)]">
                 {profile?.display_name || user.email}
               </span>
               {profile?.role && (
-                <span className="ml-2 rounded-md bg-[#131A26] px-2 py-0.5 text-xs uppercase tracking-wider text-slate-300 ring-1 ring-slate-800">
+                <span className="ml-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
                   {profile.role}
                 </span>
               )}
@@ -139,7 +141,7 @@ export default function HomePage() {
                 setSelectedPropertyId(e.target.value);
                 setSelectedFloorId("all");
               }}
-              className="min-h-11 rounded-full border border-slate-800 bg-[#131A26] px-4 text-sm font-medium text-slate-200 focus:border-[#38BDF8] focus:outline-none"
+              className="min-h-11 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 text-sm font-medium text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
             >
               {data.properties.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -149,13 +151,15 @@ export default function HomePage() {
             </select>
           )}
 
+          <ThemeToggle />
+
           {isAdmin && (
             <button
               type="button"
               onClick={() => setIsAdminOpen(true)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[#38BDF8]/40 bg-[#38BDF8]/15 px-4 py-2 text-sm font-medium text-sky-200 transition-colors hover:bg-[#38BDF8]/25"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[#6B8E6B]/45 bg-[#6B8E6B]/15 px-4 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#6B8E6B]/25"
             >
-              <Settings2 className="h-4 w-4" aria-hidden="true" />
+              <Settings2 className="h-4 w-4 text-[#6B8E6B]" aria-hidden="true" />
               <span>Redigera hemmet</span>
             </button>
           )}
@@ -166,7 +170,7 @@ export default function HomePage() {
             type="button"
             onClick={signOut}
             title="Logga ut"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-800 bg-[#131A26] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:border-slate-700 hover:text-slate-100"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[#C86D51]/50 hover:text-[var(--text-primary)]"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Logga ut</span>
@@ -175,25 +179,25 @@ export default function HomePage() {
       </header>
 
       {dataError && (
-        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
+        <div className="rounded-2xl border border-[#C86D51]/40 bg-[#C86D51]/10 p-4 text-sm text-[#C86D51]">
           Kunde inte hämta data från Supabase: {dataError}
         </div>
       )}
 
       {dataLoading ? (
-        <div className="flex items-center gap-3 py-12 text-sm text-slate-400">
-          <Loader2 className="h-5 w-5 animate-spin text-[#38BDF8]" />
+        <div className="flex items-center gap-3 py-12 text-sm text-[var(--text-secondary)]">
+          <Loader2 className="h-5 w-5 animate-spin text-[#6B8E6B]" />
           <span>Hämtar rum och enheter…</span>
         </div>
       ) : data.properties.length === 0 ? (
         <Card className="mx-auto my-8 flex max-w-lg flex-col items-center gap-4 p-8 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#38BDF8]/15 text-[#38BDF8]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#6B8E6B]/15 text-[#6B8E6B]">
             <Home className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-semibold text-slate-100">
+          <h2 className="font-display text-2xl font-semibold text-[var(--text-primary)]">
             Välkommen till Almvägen Family Hub
           </h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-[var(--text-secondary)]">
             {isAdmin
               ? "Databasen är tom ännu. Skapa ditt första hus, våningar, rum och koppla Home Assistant-entiteter."
               : "Inga hus eller rum har delats med ditt konto ännu. Kontakta familjens administratör."}
@@ -202,7 +206,7 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setIsAdminOpen(true)}
-              className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#38BDF8] px-6 py-3 text-sm font-semibold text-slate-950 hover:bg-sky-300"
+              className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#6B8E6B] px-6 py-3 text-sm font-semibold text-white hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
               <span>Skapa ditt första hus</span>
@@ -215,11 +219,11 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <h2
                 id="energy-heading"
-                className="text-xs font-semibold uppercase tracking-wider text-slate-400"
+                className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
               >
                 Översikt &amp; Energi
               </h2>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-[var(--text-secondary)]">
                 Realtidsdata via HA
               </span>
             </div>
@@ -246,16 +250,15 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <h2
                 id="rooms-heading"
-                className="text-xs font-semibold uppercase tracking-wider text-slate-400"
+                className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
               >
                 Rum &amp; Enheter
               </h2>
-              <span className="text-xs text-slate-500">
-                {visibleRooms.length} {visibleRooms.length === 1 ? "rum" : "rum"}
+              <span className="tabular-nums text-xs text-[var(--text-secondary)]">
+                {visibleRooms.length} rum
               </span>
             </div>
 
-            {/* Mobile horizontal pill navigation */}
             {propertyFloors.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
                 <button
@@ -263,8 +266,8 @@ export default function HomePage() {
                   onClick={() => setSelectedFloorId("all")}
                   className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
                     selectedFloorId === "all"
-                      ? "bg-[#38BDF8] text-slate-950"
-                      : "border border-slate-800 bg-[#131A26] text-slate-300"
+                      ? "bg-[#6B8E6B] text-white"
+                      : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
                   }`}
                 >
                   <Layers className="h-4 w-4" />
@@ -277,8 +280,8 @@ export default function HomePage() {
                     onClick={() => setSelectedFloorId(floor.id)}
                     className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
                       selectedFloorId === floor.id
-                        ? "bg-[#38BDF8] text-slate-950"
-                        : "border border-slate-800 bg-[#131A26] text-slate-300"
+                        ? "bg-[#6B8E6B] text-white"
+                        : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
                     }`}
                   >
                     <DynamicIcon name={floor.icon ?? "layers"} className="h-4 w-4" />
@@ -289,16 +292,18 @@ export default function HomePage() {
             )}
 
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-              {/* Wall Tablet / Desktop left floor rail */}
               {propertyFloors.length > 0 && (
-                <aside className="hidden w-56 shrink-0 flex-col gap-2 rounded-2xl border border-slate-800/80 bg-[#131A26] p-3 lg:flex">
+                <aside
+                  style={{ boxShadow: "var(--card-shadow)" }}
+                  className="hidden w-56 shrink-0 flex-col gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 lg:flex"
+                >
                   <button
                     type="button"
                     onClick={() => setSelectedFloorId("all")}
-                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
+                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
                       selectedFloorId === "all"
-                        ? "bg-[#38BDF8]/15 text-[#38BDF8] ring-1 ring-[#38BDF8]/40"
-                        : "text-slate-300 hover:bg-slate-800/60"
+                        ? "bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/40"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     <Layers className="h-4 w-4 shrink-0" />
@@ -309,10 +314,10 @@ export default function HomePage() {
                       key={floor.id}
                       type="button"
                       onClick={() => setSelectedFloorId(floor.id)}
-                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
+                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
                         selectedFloorId === floor.id
-                          ? "bg-[#38BDF8]/15 text-[#38BDF8] ring-1 ring-[#38BDF8]/40"
-                          : "text-slate-300 hover:bg-slate-800/60"
+                          ? "bg-[#6B8E6B]/15 text-[#6B8E6B] ring-1 ring-[#6B8E6B]/40"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
                       }`}
                     >
                       <DynamicIcon
@@ -327,7 +332,7 @@ export default function HomePage() {
 
               <div className="min-w-0 flex-1">
                 {visibleRooms.length === 0 ? (
-                  <Card className="border-dashed border-slate-800 bg-[#131A26]/50 text-center text-sm text-slate-400">
+                  <Card className="border-dashed text-center text-sm text-[var(--text-secondary)]">
                     Inga rum att visa här ännu.
                     {isAdmin &&
                       " Öppna 'Redigera hemmet' för att lägga till våningar och rum."}
@@ -352,12 +357,12 @@ export default function HomePage() {
         </>
       )}
 
-      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-900 pt-6 text-xs text-slate-500">
+      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-6 text-xs text-[var(--text-secondary)]">
         <span className="inline-flex items-center gap-1.5">
-          <ShieldCheck className="h-4 w-4 text-slate-600" aria-hidden="true" />
+          <ShieldCheck className="h-4 w-4 text-[#6B8E6B]" aria-hidden="true" />
           <span>Home Assistant WebSocket &amp; Supabase RLS</span>
         </span>
-        <span>Cloudflare Static Export</span>
+        <span>Almvägen Family Hub</span>
       </footer>
 
       {isAdmin && (
