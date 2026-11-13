@@ -21,10 +21,18 @@ export interface Profile {
   avatar_url: string | null;
   role: ProfileRole;
   allowed_room_ids: string[] | null;
+  allowed_widget_ids: string[] | null;
+  show_energy: boolean;
+  show_scenes: boolean;
+  show_family_board: boolean;
+  default_floor_id: string | null;
   quick_pin: string | null;
   avatar_icon: string | null;
   email: string | null;
 }
+
+export const PROFILE_SELECT_COLUMNS =
+  "id, display_name, avatar_url, role, allowed_room_ids, allowed_widget_ids, show_energy, show_scenes, show_family_board, default_floor_id, quick_pin, avatar_icon, email";
 
 export interface FamilyNote {
   id: string;

@@ -18,17 +18,19 @@ import {
   X,
 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import type {
-  DashboardWidget,
-  Floor,
-  HomeDataState,
-  Profile,
-  ProfileRole,
-  Room,
-  RoomDevice,
-  WidgetCategory,
-  WidgetType,
+import {
+  PROFILE_SELECT_COLUMNS,
+  type DashboardWidget,
+  type Floor,
+  type HomeDataState,
+  type Profile,
+  type ProfileRole,
+  type Room,
+  type RoomDevice,
+  type WidgetCategory,
+  type WidgetType,
 } from "@/lib/supabase/types";
+import { AvatarBadge } from "@/components/ui/AvatarBadge";
 import { DynamicIcon } from "@/components/ui/IconResolver";
 import { HAEntityPicker } from "./HAEntityPicker";
 import { IconPicker } from "./IconPicker";
@@ -134,11 +136,17 @@ export function AdminPanel({
     null,
   );
 
-  // Family profiles
+  // Family & tablet profiles
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(false);
-  const [pinDrafts, setPinDrafts] = useState<Record<string, string>>({});
-  const [avatarDrafts, setAvatarDrafts] = useState<Record<string, string>>({});
+  const [newProfileName, setNewProfileName] = useState("");
+  const [newProfileRole, setNewProfileRole] = useState<ProfileRole>("tablet");
+  const [newProfilePin, setNewProfilePin] = useState("");
+  const [newProfileIcon, setNewProfileIcon] = useState("room_living");
+  const [expandedProfileId, setExpandedProfileId] = useState<string | null>(
+    null,
+  );
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     const defaultProp = activePropertyId ?? data.properties[0]?.id ?? "";
@@ -163,23 +171,12 @@ export function AdminPanel({
     setProfilesLoading(true);
     const { data: rows, error } = await supabase
       .from("profiles")
-      .select(
-        "id, display_name, avatar_url, role, allowed_room_ids, quick_pin, avatar_icon, email",
-      )
+      .select(PROFILE_SELECT_COLUMNS)
       .order("display_name", { ascending: true });
     if (error) {
       setFeedback(`Kunde inte hämta familjeprofiler: ${error.message}`);
     } else if (rows) {
-      const typed = rows as Profile[];
-      setProfiles(typed);
-      const pins: Record<string, string> = {};
-      const avatars: Record<string, string> = {};
-      for (const p of typed) {
-        pins[p.id] = p.quick_pin ?? "";
-        avatars[p.id] = p.avatar_icon ?? "";
-      }
-      setPinDrafts(pins);
-      setAvatarDrafts(avatars);
+      setProfiles(rows as Profile[]);
     }
     setProfilesLoading(false);
   }, []);
@@ -580,71 +577,137 @@ export function AdminPanel({
     await runMutation(() => supabase.from(table).delete().eq("id", id));
   }
 
-  async function updateProfileRole(profileId: string, role: ProfileRole) {
+  async function handleCreateProfile(e: FormEvent) {
+    e.preventDefault();
     const supabase = getSupabaseClient();
-    if (!supabase) return;
-    setBusy(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role })
-      .eq("id", profileId);
-    if (error) {
-      setFeedback(`Kunde inte uppdatera roll: ${error.message}`);
-    } else {
-      await loadProfiles();
-      await onDataChanged();
-    }
-    setBusy(false);
-  }
-
-  async function toggleAllowedRoom(profile: Profile, roomId: string) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-    const current = profile.allowed_room_ids ?? [];
-    const next = current.includes(roomId)
-      ? current.filter((id) => id !== roomId)
-      : [...current, roomId];
-
-    setBusy(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ allowed_room_ids: next })
-      .eq("id", profile.id);
-    if (error) {
-      setFeedback(`Kunde inte uppdatera rumsbehörighet: ${error.message}`);
-    } else {
-      await loadProfiles();
-    }
-    setBusy(false);
-  }
-
-  async function saveProfileQuickLogin(profileId: string) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-    const rawPin = (pinDrafts[profileId] ?? "").trim();
+    if (!supabase || !newProfileName.trim()) return;
+    const rawPin = newProfilePin.trim();
     if (rawPin && !/^\d{4}$/.test(rawPin)) {
       setFeedback("Snabb-PIN måste bestå av exakt 4 siffror (eller lämnas tom).");
       return;
     }
-    const avatarIcon = (avatarDrafts[profileId] ?? "").trim() || null;
+
+    setBusy(true);
+    setFeedback(null);
+    const { data: inserted, error } = await supabase
+      .from("profiles")
+      .insert({
+        display_name: newProfileName.trim(),
+        role: newProfileRole,
+        quick_pin: rawPin || null,
+        avatar_icon: newProfileIcon || null,
+        allowed_room_ids: [],
+        allowed_widget_ids: [],
+        show_energy: true,
+        show_scenes: true,
+        show_family_board: true,
+        default_floor_id: null,
+      })
+      .select(PROFILE_SELECT_COLUMNS)
+      .single();
+
+    if (error) {
+      setFeedback(`Kunde inte skapa profil: ${error.message}`);
+    } else {
+      setNewProfileName("");
+      setNewProfilePin("");
+      await loadProfiles();
+      if (inserted) {
+        const created = inserted as Profile;
+        setExpandedProfileId(created.id);
+        setEditingProfile(created);
+      }
+      setFeedback("Ny profil/surfplatta skapad. Anpassa rum och widgets nedan.");
+    }
+    setBusy(false);
+  }
+
+  async function handleSaveProfile(e: FormEvent) {
+    e.preventDefault();
+    const supabase = getSupabaseClient();
+    if (!supabase || !editingProfile) return;
+    const rawPin = (editingProfile.quick_pin ?? "").trim();
+    if (rawPin && !/^\d{4}$/.test(rawPin)) {
+      setFeedback("Snabb-PIN måste bestå av exakt 4 siffror (eller lämnas tom).");
+      return;
+    }
 
     setBusy(true);
     setFeedback(null);
     const { error } = await supabase
       .from("profiles")
       .update({
+        display_name: editingProfile.display_name?.trim() || null,
+        role: editingProfile.role,
         quick_pin: rawPin || null,
-        avatar_icon: avatarIcon,
+        avatar_icon: editingProfile.avatar_icon || null,
+        allowed_room_ids: editingProfile.allowed_room_ids ?? [],
+        allowed_widget_ids: editingProfile.allowed_widget_ids ?? [],
+        show_energy: editingProfile.show_energy,
+        show_scenes: editingProfile.show_scenes,
+        show_family_board: editingProfile.show_family_board,
+        default_floor_id: editingProfile.default_floor_id || null,
       })
-      .eq("id", profileId);
+      .eq("id", editingProfile.id);
+
     if (error) {
-      setFeedback(`Kunde inte spara snabb-PIN: ${error.message}`);
+      setFeedback(`Kunde inte spara profil: ${error.message}`);
     } else {
-      setFeedback("Profilens snabb-PIN och ikon sparades.");
+      setFeedback("Profilen sparades.");
       await loadProfiles();
       await onDataChanged();
     }
     setBusy(false);
+  }
+
+  async function handleDeleteProfile(profileId: string) {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    setBusy(true);
+    setFeedback(null);
+    const { error } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", profileId);
+    if (error) {
+      setFeedback(`Kunde inte ta bort profil: ${error.message}`);
+    } else {
+      if (expandedProfileId === profileId) {
+        setExpandedProfileId(null);
+        setEditingProfile(null);
+      }
+      await loadProfiles();
+    }
+    setBusy(false);
+  }
+
+  function toggleExpandProfile(profile: Profile) {
+    if (expandedProfileId === profile.id) {
+      setExpandedProfileId(null);
+      setEditingProfile(null);
+    } else {
+      setExpandedProfileId(profile.id);
+      setEditingProfile({
+        ...profile,
+        allowed_room_ids: profile.allowed_room_ids ?? [],
+        allowed_widget_ids: profile.allowed_widget_ids ?? [],
+        show_energy: profile.show_energy ?? true,
+        show_scenes: profile.show_scenes ?? true,
+        show_family_board: profile.show_family_board ?? true,
+      });
+    }
+  }
+
+  function toggleEditingProfileArray(
+    field: "allowed_room_ids" | "allowed_widget_ids",
+    itemId: string,
+  ) {
+    if (!editingProfile) return;
+    const current = editingProfile[field] ?? [];
+    const next = current.includes(itemId)
+      ? current.filter((id) => id !== itemId)
+      : [...current, itemId];
+    setEditingProfile({ ...editingProfile, [field]: next });
   }
 
   function toggleExpandRoom(room: Room) {
@@ -701,7 +764,7 @@ export function AdminPanel({
               { id: "properties", label: "Hus & Våningar" },
               { id: "devices", label: "Alla Enheter" },
               { id: "widgets", label: "Översikts-widgets" },
-              { id: "family", label: "Familj & PIN" },
+              { id: "family", label: "Familj & Surfplattor" },
             ] as const
           ).map((item) => (
             <button
@@ -1958,13 +2021,13 @@ export function AdminPanel({
             </div>
           )}
 
-          {/* TAB: FAMILY */}
+          {/* TAB: FAMILY & TABLETS */}
           {tab === "family" && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
                   <Users className="h-4 w-4 text-[#6B8E6B]" />
-                  <span>Familjemedlemmar, roller & snabb-PIN</span>
+                  <span>Familjemedlemmar &amp; Väggplattor ({profiles.length})</span>
                 </div>
                 <button
                   type="button"
@@ -1976,138 +2039,389 @@ export function AdminPanel({
                 </button>
               </div>
 
-              <div className="rounded-2xl border border-[#6B8E6B]/30 bg-[#6B8E6B]/10 p-4 text-xs text-[var(--text-primary)]">
-                <p className="font-semibold text-[#6B8E6B]">
-                  Så lägger du till en ny familjemedlem eller väggplatta:
+              {/* Create new profile / wall tablet */}
+              <form
+                onSubmit={handleCreateProfile}
+                className={`${cardClass} space-y-3`}
+              >
+                <p className="font-serif text-sm font-semibold text-[var(--text-primary)]">
+                  Skapa ny profil / surfplatta
                 </p>
-                <ol className="mt-1.5 list-inside list-decimal space-y-1 text-[var(--text-secondary)]">
-                  <li>
-                    Skapa användaren i Supabase Dashboard (Authentication → Users →
-                    Add user) eller låt personen logga in första gången.
-                  </li>
-                  <li>
-                    Sätt rollen nedan till <strong>child</strong> (eget rum),{" "}
-                    <strong>tablet</strong> (väggplatta) eller{" "}
-                    <strong>admin</strong>.
-                  </li>
-                  <li>
-                    Ange en valfri 4-siffrig <strong>Snabb-PIN</strong> för
-                    snabb profilväxling på väggplattan.
-                  </li>
-                </ol>
-              </div>
-
-              {profiles.map((p) => (
-                <div
-                  key={p.id}
-                  className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-serif text-sm font-semibold text-[var(--text-primary)]">
-                        {p.display_name || "Namnlös användare"}
-                      </p>
-                      <p className="font-mono text-xs text-[var(--text-secondary)]">
-                        {p.email ? `${p.email} · ` : ""}
-                        {p.id}
-                      </p>
-                    </div>
-                    <select
-                      value={p.role}
-                      disabled={busy}
-                      onChange={(e) =>
-                        updateProfileRole(p.id, e.target.value as ProfileRole)
-                      }
-                      className="min-h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-sm text-[var(--text-primary)]"
-                    >
-                      {ROLES.map((role) => (
-                        <option key={role} value={role}>
-                          Roll: {role}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 sm:grid-cols-[140px_1fr_auto] sm:items-end">
-                    <div>
-                      <label className="mb-1 flex items-center gap-1 text-[11px] font-medium text-[var(--text-secondary)]">
-                        <KeyRound className="h-3 w-3 text-[#D49A42]" />
-                        Snabb-PIN (4 siffror)
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={4}
-                        value={pinDrafts[p.id] ?? ""}
-                        onChange={(e) =>
-                          setPinDrafts((prev) => ({
-                            ...prev,
-                            [p.id]: e.target.value.replace(/\D/g, "").slice(0, 4),
-                          }))
-                        }
-                        placeholder="t.ex. 1234"
-                        className="min-h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 font-mono text-sm tracking-widest text-[var(--text-primary)]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
-                        Avatar-ikon (valfri ikon-nyckel)
-                      </label>
-                      <input
-                        type="text"
-                        value={avatarDrafts[p.id] ?? ""}
-                        onChange={(e) =>
-                          setAvatarDrafts((prev) => ({
-                            ...prev,
-                            [p.id]: e.target.value,
-                          }))
-                        }
-                        placeholder="t.ex. room_bedroom eller user"
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => saveProfileQuickLogin(p.id)}
-                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#6B8E6B] px-4 text-xs font-semibold text-white hover:bg-[#5B7D5B] disabled:opacity-50"
-                    >
-                      <Check className="h-4 w-4" /> Spara PIN
-                    </button>
-                  </div>
-
-                  {p.role === "child" && (
-                    <div className="space-y-2 pt-1">
-                      <p className="text-xs font-medium text-[var(--text-secondary)]">
-                        Tillåtna rum (utöver gemensamma ytor):
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {data.rooms.map((r) => {
-                          const checked = (p.allowed_room_ids ?? []).includes(
-                            r.id,
-                          );
-                          return (
-                            <button
-                              key={r.id}
-                              type="button"
-                              onClick={() => toggleAllowedRoom(p, r.id)}
-                              className={`min-h-9 rounded-xl border px-3 text-xs font-medium transition-colors ${
-                                checked
-                                  ? "border-[#6B8E6B] bg-[#6B8E6B]/15 text-[var(--text-primary)]"
-                                  : "border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
-                              }`}
-                            >
-                              {r.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input
+                    type="text"
+                    required
+                    value={newProfileName}
+                    onChange={(e) => setNewProfileName(e.target.value)}
+                    placeholder="Namn (t.ex. Bella, Kökspanel)"
+                    className={inputClass}
+                  />
+                  <select
+                    value={newProfileRole}
+                    onChange={(e) =>
+                      setNewProfileRole(e.target.value as ProfileRole)
+                    }
+                    className={inputClass}
+                  >
+                    <option value="tablet">Väggplatta / Panel (tablet)</option>
+                    <option value="child">Familjemedlem / Barn (child)</option>
+                    <option value="admin">Förälder / Admin (admin)</option>
+                  </select>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={newProfilePin}
+                    onChange={(e) =>
+                      setNewProfilePin(
+                        e.target.value.replace(/\D/g, "").slice(0, 4),
+                      )
+                    }
+                    placeholder="Snabb-PIN (4 siffror, valfri)"
+                    className={`${inputClass} font-mono tracking-widest`}
+                  />
                 </div>
-              ))}
+
+                <IconPicker
+                  value={newProfileIcon}
+                  onChange={setNewProfileIcon}
+                  label="Ikon / Avatar"
+                />
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#6B8E6B] px-5 text-sm font-semibold text-white hover:bg-[#5B7D5B] disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" /> Skapa profil / platta
+                  </button>
+                </div>
+              </form>
+
+              {/* Existing profiles list */}
+              <div className="space-y-3">
+                {profiles.map((p) => {
+                  const isExpanded = expandedProfileId === p.id;
+                  const draft =
+                    editingProfile?.id === p.id ? editingProfile : p;
+                  const roleLabel =
+                    p.role === "admin"
+                      ? "Admin"
+                      : p.role === "tablet"
+                        ? "Väggplatta"
+                        : "Familjemedlem";
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandProfile(p)}
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-[#6B8E6B]" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
+                          )}
+                          <AvatarBadge
+                            avatarUrl={p.avatar_url}
+                            avatarIcon={p.avatar_icon}
+                            displayName={p.display_name}
+                            sizeClass="h-9 w-9"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate font-serif text-sm font-semibold text-[var(--text-primary)]">
+                                {p.display_name || "Namnlös profil"}
+                              </p>
+                              <span className="rounded-md bg-[#6B8E6B]/15 px-2 py-0.5 text-[11px] font-medium text-[#6B8E6B]">
+                                {roleLabel}
+                              </span>
+                              {p.quick_pin && (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-[#D49A42]/15 px-2 py-0.5 text-[11px] font-medium text-[#D49A42]">
+                                  <KeyRound className="h-3 w-3" /> PIN
+                                </span>
+                              )}
+                            </div>
+                            <p className="truncate text-xs text-[var(--text-secondary)]">
+                              {p.email ? `${p.email} · ` : ""}
+                              {(p.allowed_room_ids ?? []).length} rum ·{" "}
+                              {(p.allowed_widget_ids ?? []).length} widgets
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandProfile(p)}
+                            aria-label="Anpassa profil"
+                            className="rounded-lg p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          {!p.email && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProfile(p.id)}
+                              aria-label="Ta bort profil"
+                              className="rounded-lg p-2 text-[#C86D51] hover:bg-[#C86D51]/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isExpanded && editingProfile?.id === p.id && (
+                        <form
+                          onSubmit={handleSaveProfile}
+                          className="space-y-4 border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-4"
+                        >
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <div>
+                              <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                                Namn
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={draft.display_name ?? ""}
+                                onChange={(e) =>
+                                  setEditingProfile({
+                                    ...draft,
+                                    display_name: e.target.value,
+                                  })
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                                Typ / Roll
+                              </label>
+                              <select
+                                value={draft.role}
+                                onChange={(e) =>
+                                  setEditingProfile({
+                                    ...draft,
+                                    role: e.target.value as ProfileRole,
+                                  })
+                                }
+                                className={inputClass}
+                              >
+                                {ROLES.map((role) => (
+                                  <option key={role} value={role}>
+                                    {role}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                                Snabb-PIN (4 siffror)
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={4}
+                                value={draft.quick_pin ?? ""}
+                                onChange={(e) =>
+                                  setEditingProfile({
+                                    ...draft,
+                                    quick_pin: e.target.value
+                                      .replace(/\D/g, "")
+                                      .slice(0, 4),
+                                  })
+                                }
+                                placeholder="Valfri PIN"
+                                className={`${inputClass} font-mono tracking-widest`}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                                Startvåning
+                              </label>
+                              <select
+                                value={draft.default_floor_id ?? ""}
+                                onChange={(e) =>
+                                  setEditingProfile({
+                                    ...draft,
+                                    default_floor_id: e.target.value || null,
+                                  })
+                                }
+                                className={inputClass}
+                              >
+                                <option value="">Alla våningar</option>
+                                {data.floors.map((f) => (
+                                  <option key={f.id} value={f.id}>
+                                    {f.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <IconPicker
+                            value={draft.avatar_icon ?? "room_living"}
+                            onChange={(icon) =>
+                              setEditingProfile({
+                                ...draft,
+                                avatar_icon: icon,
+                              })
+                            }
+                            label="Ikon / Avatar"
+                          />
+
+                          {/* Module visibility toggles */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                              Moduler på startsidan
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <label className="flex min-h-10 items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-primary)]">
+                                <input
+                                  type="checkbox"
+                                  checked={draft.show_energy}
+                                  onChange={(e) =>
+                                    setEditingProfile({
+                                      ...draft,
+                                      show_energy: e.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-[#6B8E6B]"
+                                />
+                                <span>Energimätare &amp; Översikt</span>
+                              </label>
+                              <label className="flex min-h-10 items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-primary)]">
+                                <input
+                                  type="checkbox"
+                                  checked={draft.show_scenes}
+                                  onChange={(e) =>
+                                    setEditingProfile({
+                                      ...draft,
+                                      show_scenes: e.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-[#6B8E6B]"
+                                />
+                                <span>Snabbscener</span>
+                              </label>
+                              <label className="flex min-h-10 items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-primary)]">
+                                <input
+                                  type="checkbox"
+                                  checked={draft.show_family_board}
+                                  onChange={(e) =>
+                                    setEditingProfile({
+                                      ...draft,
+                                      show_family_board: e.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-[#6B8E6B]"
+                                />
+                                <span>Familjens anslagstavla</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* Allowed rooms */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                              Tillåtna rum ({(draft.allowed_room_ids ?? []).length}{" "}
+                              valda)
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {data.rooms.map((r) => {
+                                const checked = (
+                                  draft.allowed_room_ids ?? []
+                                ).includes(r.id);
+                                return (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleEditingProfileArray(
+                                        "allowed_room_ids",
+                                        r.id,
+                                      )
+                                    }
+                                    className={`min-h-9 rounded-xl border px-3 text-xs font-medium transition-colors ${
+                                      checked
+                                        ? "border-[#6B8E6B] bg-[#6B8E6B]/15 text-[var(--text-primary)]"
+                                        : "border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
+                                    }`}
+                                  >
+                                    {r.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Allowed widgets */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                              Tillåtna översikts-widgets (
+                              {(draft.allowed_widget_ids ?? []).length} valda)
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {data.dashboardWidgets.map((w) => {
+                                const checked = (
+                                  draft.allowed_widget_ids ?? []
+                                ).includes(w.id);
+                                return (
+                                  <button
+                                    key={w.id}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleEditingProfileArray(
+                                        "allowed_widget_ids",
+                                        w.id,
+                                      )
+                                    }
+                                    className={`min-h-9 rounded-xl border px-3 text-xs font-medium transition-colors ${
+                                      checked
+                                        ? "border-[#6B8E6B] bg-[#6B8E6B]/15 text-[var(--text-primary)]"
+                                        : "border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
+                                    }`}
+                                  >
+                                    {w.title}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpandedProfileId(null);
+                                setEditingProfile(null);
+                              }}
+                              className="min-h-9 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 text-xs font-medium text-[var(--text-secondary)]"
+                            >
+                              Stäng
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={busy}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#6B8E6B] px-5 text-xs font-semibold text-white hover:bg-[#5B7D5B]"
+                            >
+                              <Check className="h-3.5 w-3.5" /> Spara profil
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

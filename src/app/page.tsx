@@ -27,6 +27,7 @@ import { DynamicIcon } from "@/components/ui/IconResolver";
 import { InstallAppBanner } from "@/components/ui/InstallAppBanner";
 import { AvatarBadge } from "@/components/ui/AvatarBadge";
 import { ProfileSetupModal } from "@/components/ui/ProfileSetupModal";
+import { ProfileSwitcherModal } from "@/components/auth/ProfileSwitcherModal";
 
 export default function HomePage() {
   const {
@@ -35,7 +36,6 @@ export default function HomePage() {
     isAdmin,
     isLoading: authLoading,
     isPinLocked,
-    lockWithPin,
     signOut,
   } = useAuth();
   const {
@@ -51,6 +51,7 @@ export default function HomePage() {
   const [selectedFloorId, setSelectedFloorId] = useState<string>("all");
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
   useEffect(() => {
     if (
@@ -73,6 +74,15 @@ export default function HomePage() {
     [data.floors, activeProperty?.id],
   );
 
+  useEffect(() => {
+    const defaultFloor = profile?.default_floor_id;
+    if (defaultFloor && propertyFloors.some((f) => f.id === defaultFloor)) {
+      setSelectedFloorId(defaultFloor);
+    } else {
+      setSelectedFloorId("all");
+    }
+  }, [profile?.id, profile?.default_floor_id, propertyFloors]);
+
   const floorNameById = useMemo(
     () => new Map(propertyFloors.map((f) => [f.id, f.name])),
     [propertyFloors],
@@ -80,22 +90,40 @@ export default function HomePage() {
 
   const visibleRooms = useMemo(() => {
     const floorIds = new Set(propertyFloors.map((f) => f.id));
+    const allowedRoomIds = profile?.allowed_room_ids ?? [];
+    const filterByProfile = profile && profile.role !== "admin";
+
     return data.rooms.filter((r) => {
       if (!floorIds.has(r.floor_id)) return false;
+      if (filterByProfile) {
+        if (allowedRoomIds.length > 0) {
+          if (!allowedRoomIds.includes(r.id)) return false;
+        } else if (!r.is_common_area) {
+          return false;
+        }
+      }
       if (selectedFloorId !== "all" && r.floor_id !== selectedFloorId) {
         return false;
       }
       return true;
     });
-  }, [data.rooms, propertyFloors, selectedFloorId]);
+  }, [data.rooms, propertyFloors, selectedFloorId, profile]);
 
-  const propertyWidgets = useMemo(
-    () =>
-      data.dashboardWidgets.filter(
-        (w) => w.property_id === activeProperty?.id,
-      ),
-    [data.dashboardWidgets, activeProperty?.id],
-  );
+  const propertyWidgets = useMemo(() => {
+    const allowedWidgetIds = profile?.allowed_widget_ids ?? [];
+    const filterByProfile =
+      profile && profile.role !== "admin" && allowedWidgetIds.length > 0;
+
+    return data.dashboardWidgets.filter((w) => {
+      if (w.property_id !== activeProperty?.id) return false;
+      if (filterByProfile && !allowedWidgetIds.includes(w.id)) return false;
+      return true;
+    });
+  }, [data.dashboardWidgets, activeProperty?.id, profile]);
+
+  const showEnergy = profile?.show_energy ?? true;
+  const showScenes = profile?.show_scenes ?? true;
+  const showFamilyBoard = profile?.show_family_board ?? true;
 
   const hasEnergyGaugeWidget = useMemo(
     () =>
@@ -185,6 +213,11 @@ export default function HomePage() {
         onClose={() => setIsProfileOpen(false)}
       />
 
+      <ProfileSwitcherModal
+        isOpen={isSwitcherOpen}
+        onClose={() => setIsSwitcherOpen(false)}
+      />
+
       {isAdmin && (
             <button
               type="button"
@@ -200,12 +233,12 @@ export default function HomePage() {
 
           <button
             type="button"
-            onClick={lockWithPin}
-            title="Byt profil eller lås med Snabb-PIN"
+            onClick={() => setIsSwitcherOpen(true)}
+            title="Välj panel eller profil"
             className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[#6B8E6B] hover:text-[var(--text-primary)]"
           >
             <KeyRound className="h-4 w-4 text-[#D49A42]" aria-hidden="true" />
-            <span className="hidden sm:inline">Byt profil</span>
+            <span className="hidden sm:inline">Välj panel / profil</span>
           </button>
 
           <button
@@ -251,6 +284,11 @@ export default function HomePage() {
         onClose={() => setIsProfileOpen(false)}
       />
 
+      <ProfileSwitcherModal
+        isOpen={isSwitcherOpen}
+        onClose={() => setIsSwitcherOpen(false)}
+      />
+
       {isAdmin && (
             <button
               type="button"
@@ -264,43 +302,49 @@ export default function HomePage() {
         </Card>
       ) : (
         <>
-          <section aria-labelledby="energy-heading" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2
-                id="energy-heading"
-                className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
-              >
-                Översikt &amp; Energi
-              </h2>
-              <span className="text-xs text-[var(--text-secondary)]">
-                Realtidsdata via HA
-              </span>
-            </div>
-
-            <div
-              className={`grid grid-cols-1 gap-4 ${
-                hasEnergyGaugeWidget ? "lg:grid-cols-12" : ""
-              }`}
-            >
-              {hasEnergyGaugeWidget && (
-                <div className="lg:col-span-4">
-                  <EnergyGauge widgets={propertyWidgets} isAdmin={isAdmin} />
-                </div>
-              )}
-              <div className={hasEnergyGaugeWidget ? "lg:col-span-8" : ""}>
-                <EnergyOverview widgets={propertyWidgets} isAdmin={isAdmin} />
+          {showEnergy && (
+            <section aria-labelledby="energy-heading" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2
+                  id="energy-heading"
+                  className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
+                >
+                  Översikt &amp; Energi
+                </h2>
+                <span className="text-xs text-[var(--text-secondary)]">
+                  Realtidsdata via HA
+                </span>
               </div>
-            </div>
-          </section>
 
-          <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+              <div
+                className={`grid grid-cols-1 gap-4 ${
+                  hasEnergyGaugeWidget ? "lg:grid-cols-12" : ""
+                }`}
+              >
+                {hasEnergyGaugeWidget && (
+                  <div className="lg:col-span-4">
+                    <EnergyGauge widgets={propertyWidgets} isAdmin={isAdmin} />
+                  </div>
+                )}
+                <div className={hasEnergyGaugeWidget ? "lg:col-span-8" : ""}>
+                  <EnergyOverview widgets={propertyWidgets} isAdmin={isAdmin} />
+                </div>
+              </div>
+            </section>
+          )}
 
-          <FamilyBoard
-            propertyId={activeProperty?.id ?? null}
-            userId={user.id}
-            authorName={profile?.display_name || user.email || "Familjemedlem"}
-            isAdmin={isAdmin}
-          />
+          {showScenes && (
+            <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+          )}
+
+          {showFamilyBoard && (
+            <FamilyBoard
+              propertyId={activeProperty?.id ?? null}
+              userId={user.id}
+              authorName={profile?.display_name || user.email || "Familjemedlem"}
+              isAdmin={isAdmin}
+            />
+          )}
 
           <section aria-labelledby="rooms-heading" className="space-y-4">
             <div className="flex items-center justify-between">
@@ -424,6 +468,11 @@ export default function HomePage() {
       <ProfileSetupModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
+      />
+
+      <ProfileSwitcherModal
+        isOpen={isSwitcherOpen}
+        onClose={() => setIsSwitcherOpen(false)}
       />
 
       {isAdmin && (

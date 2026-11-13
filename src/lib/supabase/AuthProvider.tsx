@@ -10,9 +10,10 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabaseClient, isSupabaseConfigured } from "./client";
-import type { Profile } from "./types";
+import { PROFILE_SELECT_COLUMNS, type Profile } from "./types";
 
 const TRUSTED_DEVICE_KEY = "almvagen_trusted_device";
+const ACTIVE_PROFILE_KEY = "almvagen_active_profile_id";
 
 export interface AuthContextValue {
   session: Session | null;
@@ -28,6 +29,10 @@ export interface AuthContextValue {
   refreshProfile: () => Promise<void>;
   lockWithPin: () => void;
   unlockWithPin: (pin: string) => Promise<{ error: string | null }>;
+  switchProfile: (
+    targetProfile: Profile,
+    pin?: string,
+  ) => Promise<{ error: string | null }>;
   resetActiveProfile: () => void;
 }
 
@@ -49,9 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select(
-        "id, display_name, avatar_url, role, allowed_room_ids, quick_pin, avatar_icon, email",
-      )
+      .select(PROFILE_SELECT_COLUMNS)
       .eq("id", userId)
       .maybeSingle();
 
@@ -59,6 +62,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBaseProfile(data as Profile);
     } else {
       setBaseProfile(null);
+    }
+
+    try {
+      const savedProfileId = window.localStorage.getItem(ACTIVE_PROFILE_KEY);
+      if (savedProfileId && savedProfileId !== userId) {
+        const { data: savedData, error: savedErr } = await supabase
+          .from("profiles")
+          .select(PROFILE_SELECT_COLUMNS)
+          .eq("id", savedProfileId)
+          .maybeSingle();
+        if (!savedErr && savedData) {
+          setOverrideProfile(savedData as Profile);
+        }
+      }
+    } catch {
+      // Ignore storage errors
     }
   }, []);
 
@@ -156,6 +175,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabaseClient();
     if (!supabase) return;
     await supabase.auth.signOut();
+    try {
+      window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    } catch {
+      // Ignore
+    }
     setBaseProfile(null);
     setOverrideProfile(null);
     setIsPinLocked(false);
@@ -165,7 +189,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user?.id) {
       await fetchProfile(user.id);
     }
-  }, [user?.id, fetchProfile]);
+    if (overrideProfile?.id) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { data } = await supabase
+          .from("profiles")
+          .select(PROFILE_SELECT_COLUMNS)
+          .eq("id", overrideProfile.id)
+          .maybeSingle();
+        if (data) {
+          setOverrideProfile(data as Profile);
+        }
+      }
+    }
+  }, [user?.id, overrideProfile?.id, fetchProfile]);
 
   const lockWithPin = useCallback(() => {
     if (user) {
@@ -190,9 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select(
-          "id, display_name, avatar_url, role, allowed_room_ids, quick_pin, avatar_icon, email",
-        )
+        .select(PROFILE_SELECT_COLUMNS)
         .eq("quick_pin", cleanPin)
         .maybeSingle();
 
@@ -203,14 +238,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: "Felaktig PIN-kod. Försök igen." };
       }
 
-      setOverrideProfile(data as Profile);
+      const nextProfile = data as Profile;
+      setOverrideProfile(nextProfile);
+      try {
+        window.localStorage.setItem(ACTIVE_PROFILE_KEY, nextProfile.id);
+      } catch {
+        // Ignore
+      }
       setIsPinLocked(false);
       return { error: null };
     },
     [user],
   );
 
+  const switchProfile = useCallback(
+    async (
+      targetProfile: Profile,
+      pin?: string,
+    ): Promise<{ error: string | null }> => {
+      if (targetProfile.quick_pin) {
+        const cleanPin = (pin ?? "").trim();
+        if (cleanPin !== targetProfile.quick_pin) {
+          return { error: "Felaktig PIN-kod för denna profil." };
+        }
+      }
+      setOverrideProfile(targetProfile.id === user?.id ? null : targetProfile);
+      try {
+        if (targetProfile.id === user?.id) {
+          window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+        } else {
+          window.localStorage.setItem(ACTIVE_PROFILE_KEY, targetProfile.id);
+        }
+      } catch {
+        // Ignore
+      }
+      setIsPinLocked(false);
+      return { error: null };
+    },
+    [user?.id],
+  );
+
   const resetActiveProfile = useCallback(() => {
+    try {
+      window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    } catch {
+      // Ignore
+    }
     setOverrideProfile(null);
     setIsPinLocked(false);
   }, []);
@@ -232,6 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile,
       lockWithPin,
       unlockWithPin,
+      switchProfile,
       resetActiveProfile,
     }),
     [
@@ -247,6 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile,
       lockWithPin,
       unlockWithPin,
+      switchProfile,
       resetActiveProfile,
     ],
   );

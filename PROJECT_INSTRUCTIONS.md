@@ -19,7 +19,7 @@
 ---
 
 ## Databasmodell (Supabase med RLS)
-1. `profiles`: `id`, `display_name`, `avatar_url`, `avatar_icon`, `role` (`'admin' | 'tablet' | 'child'`), `allowed_room_ids` (`uuid[]`), `quick_pin`, `email`.
+1. `profiles`: `id` (auto-genererat `gen_random_uuid()` om inget auth-konto finns), `display_name`, `avatar_url`, `avatar_icon`, `role` (`'admin' | 'tablet' | 'child'`), `allowed_room_ids` (`uuid[]`), `allowed_widget_ids` (`uuid[]`), `show_energy` (`boolean`), `show_scenes` (`boolean`), `show_family_board` (`boolean`), `default_floor_id` (`uuid | null`), `quick_pin`, `email`.
 2. `properties`: `id`, `name`, `address`, `sort_order`.
 3. `floors`: `id`, `property_id`, `name`, `icon`, `sort_order`.
 4. `rooms`: `id`, `floor_id`, `name`, `icon`, `is_common_area`, `sort_order`.
@@ -30,9 +30,10 @@
 ---
 
 ## Roller & Behörigheter
-- **`admin`:** Full åtkomst till alla hus, rum, admin-widgets och `AdminPanel` ("Redigera hemmet").
-- **`tablet`:** Väggplatta i hallen; ser gemensamma ytor (`is_common_area = true`) och tillåtna rum. Kan växla till `admin` via 4-siffrig Snabb-PIN.
-- **`child`:** Ser endast sina tilldelade rum (`allowed_room_ids`) samt gemensamma ytor enligt RLS.
+- **`admin`:** Full åtkomst till alla hus, rum, admin-widgets och `AdminPanel` ("Redigera hemmet"), inklusive att skapa familjemedlemmar och skräddarsydda väggplattor utan e-postkonto.
+- **`tablet`:** Väggplatta/panel (t.ex. "Kökspanel", "Hallpanel"); anpassar synliga rum (`allowed_room_ids`), widgets (`allowed_widget_ids`), moduler (`show_energy`, `show_scenes`, `show_family_board`) och startvåning (`default_floor_id`).
+- **`child`:** Familjemedlem/barn; ser sina tilldelade rum (`allowed_room_ids`), widgets, moduler samt gemensamma ytor enligt RLS och profilinställningar.
+- **Panel-/Profilväxlare (`ProfileSwitcherModal.tsx`):** Låter en inloggad enhet växla aktiv profil/platta (skyddad med `quick_pin` om satt) och anpassar omedelbart gränssnittet.
 
 ---
 
