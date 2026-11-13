@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { HAProvider } from "@/lib/ha/HAProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="sv" className="dark">
       <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500/30">
-        {children}
+        <HAProvider>{children}</HAProvider>
       </body>
     </html>
   );

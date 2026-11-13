@@ -23,7 +23,7 @@ export default function HomePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <StatusBadge status="disconnected" />
+          <StatusBadge />
         </div>
       </header>
 
@@ -35,7 +35,7 @@ export default function HomePage() {
           >
             Energi &amp; Klimat
           </h2>
-          <span className="text-xs text-slate-500">Sprint 1.1 – Grundstruktur</span>
+          <span className="text-xs text-slate-500">Realtidsdata via HA</span>
         </div>
         <EnergyOverview />
       </section>
@@ -62,9 +62,9 @@ export default function HomePage() {
       <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-900 pt-6 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5">
           <ShieldCheck className="h-4 w-4 text-slate-600" aria-hidden="true" />
-          <span>Förberedd för Home Assistant &amp; Supabase</span>
+          <span>Home Assistant WebSocket &amp; Supabase Ready</span>
         </span>
-        <span>Cloudflare Pages Ready</span>
+        <span>Cloudflare Static Export</span>
       </footer>
     </main>
   );
