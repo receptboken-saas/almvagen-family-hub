@@ -2,6 +2,10 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.6] – 2026-11-14 (Tariff-fallback för Gemini Edge Function & träffsäkrare Tibber Pulse-skanning)
+- **Fix & fallback för elnätstariff (`EnergyConfigModal.tsx`, `EnergyDashboard.tsx`):** Skickar med `property_id` till `gemini-hub-assistant` vid hämtning av nätavgift samt lägger till en inbyggd fallback för kända svenska nätägare (E.ON, Ellevio, Vattenfall m.fl.) om Edge Function svarar med fel eller timeout — så användaren alltid får svar direkt utan rött felmeddelande.
+- **Träffsäkrare Tibber Pulse-skanning (`energyDiscovery.ts`):** Exkluderar statistik- och aggregatsensorer (`maxtimme`, `genomsnitt`, `average`, `minsta`, `hogsta`/`högsta`) vid automatiskt val av `mainPowerEntityId` och `mainEnergyEntityId` så att riktig realtidseffekt och ackumulerad kWh alltid väljs.
+
 ## [0.18.5] – 2026-11-13 (Direktsynk mot Tibber API, Gemini payload-fix & EnergyGauge-fix)
 - **Direktsynk mot Tibber GraphQL API (`tibberClient.ts`, `energyConfig.ts`, `energyEngine.ts`, `EnergyDashboard.tsx`, `EnergyConfigModal.tsx`):** Lade till valfri `Tibber API-token` under *Energiinställningar → Huvudmätare & Pris*. När den är ifylld hämtas exakta månadssiffror (kWh & kr från 1:a i månaden), timtoppar, nattlig baslast och dagens/morgondagens timpriser direkt från Tibber — så siffrorna matchar Tibber-appen även om Home Assistant-servern bara har ett par dagars lokal historik.
 - **Fix för Gemini Energirådgivare (`EnergyGeminiAdvisor.tsx`, `EnergyConfigModal.tsx`):** Wrappade `question` och `house_context` i `payload` precis som `gemini-hub-assistant` kräver, vilket löser `Cannot destructure property 'question' of 'payload'`.

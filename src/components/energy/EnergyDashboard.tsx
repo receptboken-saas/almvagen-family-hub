@@ -798,6 +798,7 @@ export function EnergyDashboard({
       {/* Admin Energy Config Modal */}
       <EnergyConfigModal
         isOpen={isConfigOpen}
+        propertyId={propertyId}
         config={config}
         defaultMunicipality={defaultMunicipality}
         rooms={rooms}

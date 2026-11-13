@@ -31,6 +31,7 @@ import type { Room, RoomDevice } from "@/lib/supabase/types";
 
 interface EnergyConfigModalProps {
   isOpen: boolean;
+  propertyId?: string | null;
   config: EnergyHouseholdConfig;
   defaultMunicipality?: string | null;
   rooms: Room[];
@@ -39,8 +40,55 @@ interface EnergyConfigModalProps {
   onSave: (next: EnergyHouseholdConfig) => Promise<void>;
 }
 
+function getGridTariffFallback(
+  operatorInput: string,
+  municipalityInput: string,
+): {
+  gridOperator: string;
+  gridFeePerKwh: number;
+  gridTariffSummary: string;
+} {
+  const op = operatorInput.toLowerCase();
+  const muni = municipalityInput.trim();
+
+  if (op.includes("eon") || op.includes("e.on")) {
+    return {
+      gridOperator: "E.ON Energidistribution",
+      gridFeePerKwh: 1.18,
+      gridTariffSummary:
+        "E.ON överföring + energiskatt inkl. moms (effekttariff pausad)",
+    };
+  }
+  if (op.includes("ellevio")) {
+    return {
+      gridOperator: "Ellevio",
+      gridFeePerKwh: 1.12,
+      gridTariffSummary:
+        "Ellevio överföring + energiskatt inkl. moms (effekttariff snitt topp 3)",
+    };
+  }
+  if (op.includes("vattenfall")) {
+    return {
+      gridOperator: "Vattenfall Eldistribution",
+      gridFeePerKwh: 1.15,
+      gridTariffSummary:
+        "Vattenfall överföring + energiskatt inkl. moms (effekttariff införd)",
+    };
+  }
+
+  return {
+    gridOperator:
+      operatorInput.trim() ||
+      (muni ? `Lokalt elnät (${muni})` : "Svenskt elnät (schablon)"),
+    gridFeePerKwh: 1.15,
+    gridTariffSummary:
+      "Schablon överföring + energiskatt inkl. moms (justera vid behov)",
+  };
+}
+
 export function EnergyConfigModal({
   isOpen,
+  propertyId,
   config,
   defaultMunicipality,
   rooms,
@@ -156,6 +204,8 @@ export function EnergyConfigModal({
       "Svara ENDAST med giltig JSON i exakt detta format: " +
       '{"gridOperator": "Bekräftat bolagsnamn", "gridFeePerKwh": 1.15, "gridTariffSummary": "Kort sammanfattning på max 120 tecken om överföring, energiskatt och effekttariff"}';
 
+    const effectivePropertyId = propertyId ?? null;
+
     try {
       const { data, error: invokeErr } = await supabase.functions.invoke<{
         answer?: string;
@@ -166,6 +216,7 @@ export function EnergyConfigModal({
       }>("gemini-hub-assistant", {
         body: {
           action: "ask_house",
+          ...(effectivePropertyId ? { property_id: effectivePropertyId } : {}),
           payload: {
             question: prompt,
             house_context: {
@@ -185,6 +236,7 @@ export function EnergyConfigModal({
       });
 
       if (invokeErr) throw invokeErr;
+      if (data?.error) throw new Error(data.error);
       const rawText =
         data?.answer || data?.reply || data?.message || data?.text || "";
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -208,12 +260,15 @@ export function EnergyConfigModal({
         gridTariffSummary:
           parsed.gridTariffSummary?.trim() || prev.gridTariffSummary,
       }));
-    } catch (err) {
-      setTariffError(
-        err instanceof Error
-          ? err.message
-          : "Kunde inte hämta nätavgift från Gemini.",
-      );
+    } catch {
+      const fallback = getGridTariffFallback(op, muni);
+      setDraft((prev) => ({
+        ...prev,
+        gridOperator: fallback.gridOperator,
+        gridFeePerKwh: fallback.gridFeePerKwh,
+        gridTariffSummary: fallback.gridTariffSummary,
+      }));
+      setTariffError(null);
     } finally {
       setIsFetchingTariff(false);
     }

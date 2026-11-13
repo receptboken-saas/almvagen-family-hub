@@ -57,6 +57,21 @@ function isEnergyEntity(ent: HassEntity): boolean {
   return dc === "energy" || unit === "kwh" || unit === "wh";
 }
 
+function isAggregateOrStatSensor(ent: HassEntity): boolean {
+  const t = `${ent.entity_id} ${ent.attributes.friendly_name ?? ""}`.toLowerCase();
+  return (
+    t.includes("maxtimme") ||
+    t.includes("genomsnitt") ||
+    t.includes("average") ||
+    t.includes("minsta") ||
+    t.includes("hogsta") ||
+    t.includes("högsta") ||
+    t.includes("min") ||
+    t.includes("max") ||
+    t.includes("avg")
+  );
+}
+
 function isPriceEntity(ent: HassEntity): boolean {
   const unit = (ent.attributes.unit_of_measurement ?? "").trim().toLowerCase();
   const text = `${ent.entity_id} ${ent.attributes.friendly_name ?? ""}`.toLowerCase();
@@ -264,14 +279,13 @@ export async function scanHomeAssistantEnergyDevices(
       null;
 
     // Pick best power & energy sensor inside the same HA device
-    const bestPower =
-      powerEnts.find((e) => {
-        const t = `${e.entity_id} ${e.attributes.friendly_name ?? ""}`.toLowerCase();
-        return !t.includes("min") && !t.includes("max") && !t.includes("avg");
-      }) ?? powerEnts[0];
+    const realPowerEnts = powerEnts.filter((e) => !isAggregateOrStatSensor(e));
+    const bestPower = realPowerEnts[0] ?? powerEnts[0];
 
+    const realEnergyEnts = energyEnts.filter((e) => !isAggregateOrStatSensor(e));
+    const energyPool = realEnergyEnts.length > 0 ? realEnergyEnts : energyEnts;
     const bestEnergy =
-      energyEnts.find((e) => {
+      energyPool.find((e) => {
         const t = `${e.entity_id} ${e.attributes.friendly_name ?? ""}`.toLowerCase();
         return (
           t.includes("ackumulerad") ||
@@ -280,7 +294,7 @@ export async function scanHomeAssistantEnergyDevices(
           t.includes("förbrukning") ||
           t.includes("consumption")
         );
-      }) ?? energyEnts[0];
+      }) ?? energyPool[0];
 
     const combinedText = `${deviceName} ${haDevice?.manufacturer ?? ""} ${haDevice?.model ?? ""} ${bestPower?.entity_id ?? ""} ${bestEnergy?.entity_id ?? ""}`;
     const isMain = isMainMeterText(combinedText);
