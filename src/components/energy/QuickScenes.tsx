@@ -64,7 +64,7 @@ export function QuickScenes({ widgets, isAdmin }: QuickScenesProps) {
           Snabba scener
         </h2>
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap">
         {scenes.map((scene) => {
           const isBusy = triggeringId === scene.id;
           return (

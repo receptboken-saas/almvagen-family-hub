@@ -79,6 +79,7 @@ export function RoomDetailDrawer({
       <div className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] shadow-2xl sm:h-full sm:max-h-none sm:max-w-lg sm:rounded-l-3xl sm:rounded-tr-none">
         {/* Header */}
         <div className="space-y-4 border-b border-[var(--border-subtle)] px-6 py-5">
+          <div className="mx-auto -mt-1 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3.5">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#6B8E6B]/15 text-[#6B8E6B]">

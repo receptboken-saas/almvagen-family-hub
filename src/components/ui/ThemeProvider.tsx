@@ -97,7 +97,7 @@ export function useTheme(): ThemeContextValue {
   return ctx;
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { mode, cycleMode } = useTheme();
 
   const label =
@@ -111,8 +111,13 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={cycleMode}
-      title="Växla tema: Ljust Linne / Mörk Valnöt / Automatiskt nattläge"
-      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition-colors hover:border-[#6B8E6B]"
+      aria-label={`Tema: ${label}. Tryck för att växla`}
+      title={`Tema: ${label} (växla mellan Linne, Valnöt och Auto)`}
+      className={
+        compact
+          ? "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm transition-colors hover:border-[#6B8E6B]"
+          : "inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition-colors hover:border-[#6B8E6B]"
+      }
     >
       {mode === "light" ? (
         <Sun className="h-4 w-4 text-[#D49A42]" aria-hidden="true" />
@@ -121,7 +126,7 @@ export function ThemeToggle() {
       ) : (
         <Clock className="h-4 w-4 text-[#6B8E6B]" aria-hidden="true" />
       )}
-      <span>{label}</span>
+      {!compact && <span>{label}</span>}
     </button>
   );
 }

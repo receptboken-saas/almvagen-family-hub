@@ -3,19 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Home,
-  KeyRound,
   Layers,
   Loader2,
-  LogOut,
   Plus,
-  Settings2,
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/useAuth";
 import { useHomeData } from "@/lib/supabase/useHomeData";
 import { LoginScreen } from "@/components/auth/LoginScreen";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { ThemeToggle } from "@/components/ui/ThemeProvider";
+import { Header } from "@/components/layout/Header";
 import { EnergyOverview } from "@/components/energy/EnergyOverview";
 import { EnergyGauge } from "@/components/energy/EnergyGauge";
 import { QuickScenes } from "@/components/energy/QuickScenes";
@@ -27,7 +23,6 @@ import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Card } from "@/components/ui/Card";
 import { DynamicIcon } from "@/components/ui/IconResolver";
 import { InstallAppBanner } from "@/components/ui/InstallAppBanner";
-import { AvatarBadge } from "@/components/ui/AvatarBadge";
 import { ProfileSetupModal } from "@/components/ui/ProfileSetupModal";
 import { ProfileSwitcherModal } from "@/components/auth/ProfileSwitcherModal";
 
@@ -155,131 +150,61 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-7 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-      <header className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-4">
+    <main className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-5 px-4 py-4 sm:gap-6 sm:px-6 sm:py-5 lg:gap-7 lg:px-8 lg:py-7">
+      <Header
+        propertyName={activeProperty?.name ?? "Almvägen Family Hub"}
+        profile={profile}
+        userEmail={user.email}
+        isAdmin={isAdmin}
+        properties={data.properties}
+        selectedPropertyId={selectedPropertyId}
+        onSelectProperty={(id) => {
+          setSelectedPropertyId(id);
+          setSelectedFloorId("all");
+        }}
+        onOpenSwitcher={() => setIsSwitcherOpen(true)}
+        onOpenProfileSetup={() => setIsProfileOpen(true)}
+        onOpenAdmin={() => setIsAdminOpen(true)}
+        onSignOut={signOut}
+      />
+
+      {!isChild && propertyFloors.length > 0 && !childSingleRoom && (
+        <nav
+          aria-label="Våningar"
+          className="-mt-1 flex gap-2 overflow-x-auto pb-1 lg:hidden"
+        >
           <button
             type="button"
-            onClick={() => setIsProfileOpen(true)}
-            title="Öppna Min profil"
-            className="rounded-2xl transition-transform hover:scale-105 focus:outline-none"
+            onClick={() => setSelectedFloorId("all")}
+            className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+              selectedFloorId === "all"
+                ? "bg-[#6B8E6B] text-white"
+                : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
+            }`}
           >
-            <AvatarBadge
-              avatarUrl={profile?.avatar_url}
-              avatarIcon={profile?.avatar_icon}
-              displayName={profile?.display_name || user.email}
-              sizeClass="h-12 w-12"
-            />
+            <Layers className="h-4 w-4" />
+            <span>Alla våningar</span>
           </button>
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-              {activeProperty?.name ?? "Almvägen Family Hub"}
-            </h1>
+          {propertyFloors.map((floor) => (
             <button
+              key={floor.id}
               type="button"
-              onClick={() => setIsProfileOpen(true)}
-              className="mt-0.5 text-left text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              onClick={() => setSelectedFloorId(floor.id)}
+              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+                selectedFloorId === floor.id
+                  ? "bg-[#6B8E6B] text-white"
+                  : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
+              }`}
             >
-              Inloggad som{" "}
-              <span className="font-semibold text-[var(--text-primary)] underline decoration-[var(--border-subtle)] underline-offset-4">
-                {profile?.display_name || user.email}
-              </span>
-              {profile?.role && (
-                <span className="ml-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  {profile.role}
-                </span>
-              )}
+              <DynamicIcon
+                name={floor.icon ?? "layers"}
+                className="h-4 w-4"
+              />
+              <span>{floor.name}</span>
             </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          {data.properties.length > 1 && (
-            <select
-              aria-label="Välj hus"
-              value={selectedPropertyId ?? ""}
-              onChange={(e) => {
-                setSelectedPropertyId(e.target.value);
-                setSelectedFloorId("all");
-              }}
-              className="min-h-11 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 text-sm font-medium text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
-            >
-              {data.properties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <ThemeToggle />
-
-          <ProfileSetupModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-      />
-
-      <ProfileSwitcherModal
-        isOpen={isSwitcherOpen}
-        onClose={() => setIsSwitcherOpen(false)}
-      />
-
-      <RoomDetailDrawer
-        room={
-          selectedRoomId
-            ? visibleRooms.find((r) => r.id === selectedRoomId) ?? null
-            : null
-        }
-        floorName={
-          selectedRoomId
-            ? floorNameById.get(
-                visibleRooms.find((r) => r.id === selectedRoomId)?.floor_id ??
-                  "",
-              )
-            : undefined
-        }
-        devices={
-          selectedRoomId
-            ? data.roomDevices.filter((d) => d.room_id === selectedRoomId)
-            : []
-        }
-        onClose={() => setSelectedRoomId(null)}
-      />
-
-      {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsAdminOpen(true)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[#6B8E6B]/45 bg-[#6B8E6B]/15 px-4 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#6B8E6B]/25"
-            >
-              <Settings2 className="h-4 w-4 text-[#6B8E6B]" aria-hidden="true" />
-              <span>Redigera hemmet</span>
-            </button>
-          )}
-
-          {!isChild && <StatusBadge />}
-
-          <button
-            type="button"
-            onClick={() => setIsSwitcherOpen(true)}
-            title="Välj panel eller profil"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[#6B8E6B] hover:text-[var(--text-primary)]"
-          >
-            <KeyRound className="h-4 w-4 text-[#D49A42]" aria-hidden="true" />
-            <span className="hidden sm:inline">Välj panel / profil</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={signOut}
-            title="Logga ut"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[#C86D51]/50 hover:text-[var(--text-primary)]"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Logga ut</span>
-          </button>
-        </div>
-      </header>
+          ))}
+        </nav>
+      )}
 
       <InstallAppBanner />
 
@@ -307,39 +232,8 @@ export default function HomePage() {
               ? "Databasen är tom ännu. Skapa ditt första hus, våningar, rum och koppla Home Assistant-entiteter."
               : "Inga hus eller rum har delats med ditt konto ännu. Kontakta familjens administratör."}
           </p>
-          <ProfileSetupModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-      />
 
-      <ProfileSwitcherModal
-        isOpen={isSwitcherOpen}
-        onClose={() => setIsSwitcherOpen(false)}
-      />
-
-      <RoomDetailDrawer
-        room={
-          selectedRoomId
-            ? visibleRooms.find((r) => r.id === selectedRoomId) ?? null
-            : null
-        }
-        floorName={
-          selectedRoomId
-            ? floorNameById.get(
-                visibleRooms.find((r) => r.id === selectedRoomId)?.floor_id ??
-                  "",
-              )
-            : undefined
-        }
-        devices={
-          selectedRoomId
-            ? data.roomDevices.filter((d) => d.room_id === selectedRoomId)
-            : []
-        }
-        onClose={() => setSelectedRoomId(null)}
-      />
-
-      {isAdmin && (
+          {isAdmin && (
             <button
               type="button"
               onClick={() => setIsAdminOpen(true)}
@@ -439,41 +333,6 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {!isChild && propertyFloors.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFloorId("all")}
-                      className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
-                        selectedFloorId === "all"
-                          ? "bg-[#6B8E6B] text-white"
-                          : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
-                      }`}
-                    >
-                      <Layers className="h-4 w-4" />
-                      <span>Alla våningar</span>
-                    </button>
-                    {propertyFloors.map((floor) => (
-                      <button
-                        key={floor.id}
-                        type="button"
-                        onClick={() => setSelectedFloorId(floor.id)}
-                        className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
-                          selectedFloorId === floor.id
-                            ? "bg-[#6B8E6B] text-white"
-                            : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]"
-                        }`}
-                      >
-                        <DynamicIcon
-                          name={floor.icon ?? "layers"}
-                          className="h-4 w-4"
-                        />
-                        <span>{floor.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                   {!isChild && propertyFloors.length > 0 && (
                     <aside
@@ -521,7 +380,7 @@ export default function HomePage() {
                           " Öppna 'Redigera hemmet' för att lägga till våningar och rum."}
                       </Card>
                     ) : (
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {visibleRooms.map((room) => (
                           <RoomCard
                             key={room.id}

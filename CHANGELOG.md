@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.7.0] – 2026-11-13 (Minimalistisk Toppmeny & Responsiv Layout)
+- **Minimalistisk Toppmeny (`Header.tsx`):** Bantade sidhuvudet till en enda ren rad (56–64 px) med husets namn i `Fraunces` + diskret HA-statusprick till vänster (klickbar för `admin` för att öppna `HAConfigModal`) och två ankarpunkter till höger: kompakt `ThemeToggle` och Profil-pill.
+- **Profil-snabbmeny (`ProfileQuickMenu.tsx`):** Ny responsiv meny (popover på tablet/desktop, bottom-sheet på mobil) med *Byt profil / panel*, *Min profil & avatar*, *Redigera hemmet* (admin), *HA-anslutning & status* (admin) samt *Logga ut* med Admin-PIN-skydd när aktiv profil är `tablet`.
+- **Responsiva brytpunkter:** Horisontell våningsmeny direkt under toppmenyn på `< 1024px` (dold i `child`-läget), 1-spalts tumvänliga rumskort på mobil (`< 640px`), 2-spalts rutnät för både översikts-widgets (`QuickScenes`, `EnergyOverview`, `FamilyBoard`) och rumskort på `640px–1024px` (uppfälld Fold / mini-tablet), samt fast vänstermeny + 3-spalts rutnät med luftig typografi på `>= 1024px` (väggplatta/desktop).
+
 ## [0.6.0] – 2026-11-13 (KISS & Plug & Play)
 - **Steg A (3-sekundersregeln):** Uppstädat `RoomCard.tsx` (ikon, namn, rumstemperatur, tända lampor + "Tänd alla" / "Släck alla") och ny responsiv `RoomDetailDrawer.tsx` med ljusstyrkereglage (0–100 %), brytare och klimatsensorer.
 - **Steg B (Zero Noise & Kontextikoner):** Kontextfiltrerad `IconPicker.tsx` (`avatar`, `room`, `device`, `widget`), 11 nya mjuka duotone-avatarer/panelikoner i `CustomIcons.tsx`, samt rollanpassade vyer (`child` med direkt `ChildRoomView.tsx`, `tablet` med panelstyrda moduler/widgets/rum och `admin`).

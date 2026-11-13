@@ -106,7 +106,7 @@ export function RoomCard({
                   {floorName}
                 </p>
               )}
-              <h3 className="font-display truncate text-xl font-semibold text-[var(--text-primary)]">
+              <h3 className="font-display truncate text-xl font-semibold text-[var(--text-primary)] lg:text-2xl">
                 {room.name}
               </h3>
             </div>
@@ -138,12 +138,12 @@ export function RoomCard({
       </button>
 
       {controllableDevices.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="grid grid-cols-2 gap-2.5 pt-1">
           <button
             type="button"
             disabled={!isConnected || bulkBusy}
             onClick={() => handleBulk(true)}
-            className="min-h-11 rounded-xl bg-[#D49A42]/18 px-3 text-xs font-semibold text-[#D49A42] transition-colors hover:bg-[#D49A42]/28 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-12 rounded-xl bg-[#D49A42]/18 px-3 text-xs font-semibold text-[#D49A42] transition-colors hover:bg-[#D49A42]/28 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-11"
           >
             Tänd alla
           </button>
@@ -151,7 +151,7 @@ export function RoomCard({
             type="button"
             disabled={!isConnected || bulkBusy}
             onClick={() => handleBulk(false)}
-            className="min-h-11 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/70 px-3 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-12 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/70 px-3 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-11"
           >
             Släck alla
           </button>
