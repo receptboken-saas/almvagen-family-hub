@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.11.0] – 2026-11-13 (Klickbar Snabb-PIN per familjemedlem & surfplatta)
+- **Klickbara profilkort i Snabb-PIN (`LoginScreen.tsx`):** När en enhet är auktoriserad hämtas alla profiler från `public.profiles` och visas som taktila avatar-kort med namn, roll-badge (`Admin` / `Väggplatta` / `Familjemedlem`) och PIN-indikator. Klick på en profil med `quick_pin` öppnar sifferknappsatsen för just den personen (`switchProfile`), medan profiler utan PIN aktiveras direkt med ett tryck.
+- **Tydlig onboarding för nya enheter (`LoginScreen.tsx`):** Om enheten saknar aktiv familjesession visas en tydlig vägledning under Snabb-PIN-fliken om att logga in med e-post och lösenord första gången.
+- **Stabil profilpersistens (`AuthProvider.tsx`):** Rensar `almvagen_active_profile_id` vid nytt e-post-/lösenordsinlogg och gör `unlockWithPin` säker mot dubblett-PIN med `.limit(1)`.
+
 ## [0.10.0] – 2026-11-13 (Skola/Kommun, Denna Vecka, Middagskort & Gemini-tolkning)
 - **Databas & Typer (`types.ts`, `useHomeData.ts`):** Lade till `school_name` och `municipality` på `Profile` samt nya typer och hämtning för `household_settings`, `weekly_events` (från idag och framåt) och `dinner_plans` (innevarande vecka mån–sön).
 - **Admin-inställningar & Gemini-synk (`AdminPanel.tsx`):** Lade till **Skola**, **Kommun** och knappen **"Synka lovdagar med Gemini"** (`gemini-hub-assistant` med `action: 'sync_school_and_waste'`) per profil, samt **Kommun** och valfri **Sophämtnings-sensor i HA** (`waste_ha_entity_id`) under *Hus & Inställningar*.

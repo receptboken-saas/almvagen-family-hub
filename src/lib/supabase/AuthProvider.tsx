@@ -166,6 +166,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setIsPinLocked(false);
       setOverrideProfile(null);
+      try {
+        window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+      } catch {
+        // Ignore
+      }
       return { error: null };
     },
     [],
@@ -229,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from("profiles")
         .select(PROFILE_SELECT_COLUMNS)
         .eq("quick_pin", cleanPin)
+        .limit(1)
         .maybeSingle();
 
       if (error) {
