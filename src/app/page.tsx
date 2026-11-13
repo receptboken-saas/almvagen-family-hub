@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Home,
+  KeyRound,
   Layers,
   Loader2,
   LogOut,
@@ -18,6 +19,7 @@ import { ThemeToggle } from "@/components/ui/ThemeProvider";
 import { EnergyOverview } from "@/components/energy/EnergyOverview";
 import { EnergyGauge } from "@/components/energy/EnergyGauge";
 import { QuickScenes } from "@/components/energy/QuickScenes";
+import { FamilyBoard } from "@/components/family/FamilyBoard";
 import { RoomCard } from "@/components/rooms/RoomCard";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Card } from "@/components/ui/Card";
@@ -25,7 +27,15 @@ import { DynamicIcon } from "@/components/ui/IconResolver";
 import { CustomSvgIcon } from "@/components/icons/CustomIcons";
 
 export default function HomePage() {
-  const { user, profile, isAdmin, isLoading: authLoading, signOut } = useAuth();
+  const {
+    user,
+    profile,
+    isAdmin,
+    isLoading: authLoading,
+    isPinLocked,
+    lockWithPin,
+    signOut,
+  } = useAuth();
   const {
     data,
     isLoading: dataLoading,
@@ -103,7 +113,7 @@ export default function HomePage() {
     );
   }
 
-  if (!user) {
+  if (!user || isPinLocked) {
     return <LoginScreen />;
   }
 
@@ -165,6 +175,16 @@ export default function HomePage() {
           )}
 
           <StatusBadge />
+
+          <button
+            type="button"
+            onClick={lockWithPin}
+            title="Byt profil eller lås med Snabb-PIN"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[#6B8E6B] hover:text-[var(--text-primary)]"
+          >
+            <KeyRound className="h-4 w-4 text-[#D49A42]" aria-hidden="true" />
+            <span className="hidden sm:inline">Byt profil</span>
+          </button>
 
           <button
             type="button"
@@ -245,6 +265,13 @@ export default function HomePage() {
           </section>
 
           <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+
+          <FamilyBoard
+            propertyId={activeProperty?.id ?? null}
+            userId={user.id}
+            authorName={profile?.display_name || user.email || "Familjemedlem"}
+            isAdmin={isAdmin}
+          />
 
           <section aria-labelledby="rooms-heading" className="space-y-4">
             <div className="flex items-center justify-between">

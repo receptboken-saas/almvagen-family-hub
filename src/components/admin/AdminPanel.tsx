@@ -120,6 +120,8 @@ export function AdminPanel({
 
   // Family profiles
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [showFamilyGuide, setShowFamilyGuide] = useState(false);
 
   const floorNameMap = useMemo(
     () => new Map(data.floors.map((f) => [f.id, f.name])),
@@ -151,7 +153,9 @@ export function AdminPanel({
     if (!supabase) return;
     const { data: rows } = await supabase
       .from("profiles")
-      .select("id, display_name, avatar_url, role, allowed_room_ids")
+      .select(
+        "id, display_name, avatar_url, role, allowed_room_ids, quick_pin, avatar_icon, email",
+      )
       .order("display_name", { ascending: true });
     if (rows) {
       setProfiles(rows as Profile[]);
@@ -1515,6 +1519,40 @@ export function AdminPanel({
 
           {tab === "family" && (
             <div className="space-y-4">
+              <div className="rounded-2xl border border-[#6B8E6B]/40 bg-[#6B8E6B]/10 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">
+                      Lägg till familjemedlemmar &amp; Väggplatta
+                    </p>
+                    <p className="text-xs text-slate-300">
+                      Skapa konton för t.ex. Bella, Marley, Kornelia, Felicia och Väggplattan i Supabase.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFamilyGuide((prev) => !prev)}
+                    className="min-h-9 rounded-xl border border-[#6B8E6B]/50 bg-[#6B8E6B]/20 px-3 text-xs font-semibold text-slate-100 hover:bg-[#6B8E6B]/30"
+                  >
+                    {showFamilyGuide ? "Dölj guide" : "Visa guide"}
+                  </button>
+                </div>
+
+                {showFamilyGuide && (
+                  <ol className="mt-3 list-inside list-decimal space-y-1.5 border-t border-[#6B8E6B]/25 pt-3 text-xs text-slate-200">
+                    <li>
+                      Öppna <strong>Supabase Dashboard → Authentication → Users → Add user</strong> och skapa ett konto med e-post &amp; lösenord (t.ex. <code>vaggplatta@almvagen.se</code> eller barnens e-post).
+                    </li>
+                    <li>
+                      Profilen dyker upp automatiskt här i listan nedan (sätt roll till <code>tablet</code> eller <code>child</code> i <code>profiles</code>-tabellen vid behov).
+                    </li>
+                    <li>
+                      Klicka på penn-ikonen nedan för att sätta en 4-siffrig <strong>Snabb-PIN</strong> och ikon, samt bocka i vilka rum personen får styra.
+                    </li>
+                  </ol>
+                )}
+              </div>
+
               {profiles.length === 0 ? (
                 <p className="text-sm text-slate-400">
                   Inga profiler hittades.
@@ -1522,26 +1560,142 @@ export function AdminPanel({
               ) : (
                 profiles.map((prof) => {
                   const allowed = prof.allowed_room_ids ?? [];
+                  const isEditingProf = editingProfile?.id === prof.id;
                   return (
                     <div
                       key={prof.id}
                       className="rounded-2xl border border-slate-800 bg-[#0B0F17]/60 p-4"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="font-semibold text-slate-100">
-                            {prof.display_name || prof.id}
-                          </p>
-                          <p className="text-xs uppercase tracking-wider text-slate-400">
-                            Roll: {prof.role}
-                          </p>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800/90 text-[#6B8E6B]">
+                            <DynamicIcon
+                              name={prof.avatar_icon ?? "ui_ha_status"}
+                              className="h-5 w-5"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-100">
+                              {prof.display_name || prof.id}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              Roll: <span className="uppercase">{prof.role}</span>
+                              {prof.email ? ` · ${prof.email}` : ""}
+                              {prof.quick_pin ? " · PIN satt" : " · Ingen PIN"}
+                            </p>
+                          </div>
                         </div>
-                        {prof.role === "admin" && (
-                          <span className="rounded-lg bg-[#38BDF8]/15 px-2.5 py-1 text-xs font-medium text-[#38BDF8]">
-                            Full åtkomst
-                          </span>
-                        )}
+
+                        <div className="flex items-center gap-2">
+                          {prof.role === "admin" && (
+                            <span className="rounded-lg bg-[#6B8E6B]/20 px-2.5 py-1 text-xs font-medium text-[#6B8E6B]">
+                              Full åtkomst
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditingProfile(isEditingProf ? null : prof)
+                            }
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span>{isEditingProf ? "Stäng" : "Redigera profil"}</span>
+                          </button>
+                        </div>
                       </div>
+
+                      {isEditingProf && editingProfile && (
+                        <form
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const supabase = getSupabaseClient();
+                            if (!supabase) return;
+                            const cleanPin = (editingProfile.quick_pin ?? "").replace(/\D/g, "").slice(0, 4);
+                            if (cleanPin && cleanPin.length !== 4) {
+                              setFeedback("Snabb-PIN måste vara exakt 4 siffror (eller lämnas tom).");
+                              return;
+                            }
+                            const ok = await runMutation(() =>
+                              supabase
+                                .from("profiles")
+                                .update({
+                                  quick_pin: cleanPin || null,
+                                  avatar_icon: editingProfile.avatar_icon || null,
+                                  email: editingProfile.email?.trim() || null,
+                                })
+                                .eq("id", editingProfile.id),
+                            );
+                            if (ok) {
+                              setEditingProfile(null);
+                              await loadProfiles();
+                            }
+                          }}
+                          className="mt-4 grid gap-3 border-t border-slate-800 pt-4 sm:grid-cols-2"
+                        >
+                          <div>
+                            <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-400">
+                              4-siffrig Snabb-PIN
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={4}
+                              value={editingProfile.quick_pin ?? ""}
+                              onChange={(e) =>
+                                setEditingProfile({
+                                  ...editingProfile,
+                                  quick_pin: e.target.value.replace(/\D/g, "").slice(0, 4),
+                                })
+                              }
+                              placeholder="t.ex. 1234"
+                              className="min-h-10 w-full rounded-xl border border-slate-700 bg-[#0B0F17] px-3 text-sm text-slate-100"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-400">
+                              Kontakt-e-post
+                            </label>
+                            <input
+                              type="email"
+                              value={editingProfile.email ?? ""}
+                              onChange={(e) =>
+                                setEditingProfile({
+                                  ...editingProfile,
+                                  email: e.target.value,
+                                })
+                              }
+                              placeholder="namn@exempel.se"
+                              className="min-h-10 w-full rounded-xl border border-slate-700 bg-[#0B0F17] px-3 text-sm text-slate-100"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <IconPicker
+                              value={editingProfile.avatar_icon ?? "ui_ha_status"}
+                              onChange={(avatar_icon) =>
+                                setEditingProfile({ ...editingProfile, avatar_icon })
+                              }
+                              label="Välj profilikon"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2 sm:col-span-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingProfile(null)}
+                              className="min-h-10 rounded-xl bg-slate-800 px-4 text-xs font-medium text-slate-300"
+                            >
+                              Avbryt
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={busy}
+                              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#6B8E6B] px-4 text-xs font-semibold text-white"
+                            >
+                              <Check className="h-4 w-4" /> Spara profil
+                            </button>
+                          </div>
+                        </form>
+                      )}
 
                       {prof.role !== "admin" && (
                         <div className="mt-3 grid gap-2 border-t border-slate-800/80 pt-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1558,7 +1712,7 @@ export function AdminPanel({
                                   onChange={() =>
                                     toggleAllowedRoom(prof, room.id)
                                   }
-                                  className="h-4 w-4 accent-[#38BDF8]"
+                                  className="h-4 w-4 accent-[#6B8E6B]"
                                 />
                                 <span className="truncate">{room.name}</span>
                               </label>

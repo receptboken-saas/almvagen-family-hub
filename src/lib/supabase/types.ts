@@ -21,6 +21,20 @@ export interface Profile {
   avatar_url: string | null;
   role: ProfileRole;
   allowed_room_ids: string[] | null;
+  quick_pin: string | null;
+  avatar_icon: string | null;
+  email: string | null;
+}
+
+export interface FamilyNote {
+  id: string;
+  property_id: string;
+  author_id: string | null;
+  author_name: string;
+  content: string;
+  is_pinned: boolean;
+  is_done: boolean;
+  created_at: string;
 }
 
 export interface Property {
