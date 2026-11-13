@@ -9,6 +9,13 @@ import {
   type PriceWindow,
 } from "@/lib/ha/energyStats";
 import type { HassEntities, HassEntity } from "@/lib/ha/types";
+import {
+  computeTibberPeriodTotals,
+  estimateTibberBaseloadWatts,
+  extractTibberPeaks,
+  findTibberCheapestWindows,
+  type TibberSyncData,
+} from "@/lib/tibber/tibberClient";
 import type {
   DashboardWidget,
   Floor,
@@ -194,6 +201,7 @@ export function computeEnergyDashboard(params: {
   dashboardWidgets: DashboardWidget[];
   entities: HassEntities;
   statistics: HAStatisticsMap;
+  tibberData?: TibberSyncData | null;
 }): EnergyDashboardSummary {
   const {
     period,
@@ -204,6 +212,7 @@ export function computeEnergyDashboard(params: {
     dashboardWidgets,
     entities,
     statistics,
+    tibberData,
   } = params;
 
   const { mainPowerEntityId, mainEnergyEntityId, priceEntityId } =
@@ -217,7 +226,8 @@ export function computeEnergyDashboard(params: {
     : undefined;
   const priceEntity = priceEntityId ? entities[priceEntityId] : undefined;
 
-  const spotPriceKr = parsePriceKr(priceEntity);
+  const spotPriceKr =
+    parsePriceKr(priceEntity) ?? tibberData?.currentPriceKr ?? null;
   const effectivePricePerKwh = (spotPriceKr ?? 0) + (config.gridFeePerKwh ?? 0);
 
   const liveTotalWattsRaw = parseEntityWatts(mainPowerEntity) ?? 0;
@@ -479,7 +489,16 @@ export function computeEnergyDashboard(params: {
 
   const liveTotalWatts =
     liveTotalWattsRaw > 0 ? liveTotalWattsRaw : measuredLiveWatts;
-  const effectiveTotalKwh = totalKwh > 0 ? totalKwh : measuredKwh;
+  const tibberTotals = tibberData
+    ? computeTibberPeriodTotals(tibberData, period)
+    : null;
+
+  const effectiveTotalKwh =
+    tibberTotals && tibberTotals.kwh > 0
+      ? tibberTotals.kwh
+      : totalKwh > 0
+        ? totalKwh
+        : measuredKwh;
   const unmeasuredKwh = Math.max(0, effectiveTotalKwh - measuredKwh);
   const unmeasuredLiveWatts = Math.max(0, liveTotalWatts - measuredLiveWatts);
 
@@ -492,9 +511,11 @@ export function computeEnergyDashboard(params: {
     priceUnit,
   );
   const totalCostKr =
-    weightedTotalCost !== null
-      ? weightedTotalCost
-      : effectiveTotalKwh * effectivePricePerKwh;
+    tibberTotals && tibberTotals.costKr > 0
+      ? tibberTotals.costKr
+      : weightedTotalCost !== null
+        ? weightedTotalCost
+        : effectiveTotalKwh * effectivePricePerKwh;
   const effectiveAvgPricePerKwh =
     effectiveTotalKwh > 0 ? totalCostKr / effectiveTotalKwh : effectivePricePerKwh;
 
@@ -585,23 +606,41 @@ export function computeEnergyDashboard(params: {
     };
   });
 
-  const topPeaks = extractTopPeaks(
+  const haTopPeaks = extractTopPeaks(
     mainEnergyStats,
     mainPowerStats,
     mainPowerEntity?.attributes.unit_of_measurement,
     3,
   );
+  const topPeaks =
+    haTopPeaks.length > 0
+      ? haTopPeaks
+      : tibberData
+        ? extractTibberPeaks(tibberData, 3)
+        : [];
 
-  const baseloadWatts = estimateBaseloadWatts(
+  const haBaseload = estimateBaseloadWatts(
     mainEnergyStats,
     mainPowerStats,
     mainPowerEntity?.attributes.unit_of_measurement,
   );
+  const baseloadWatts =
+    haBaseload !== null
+      ? haBaseload
+      : tibberData
+        ? estimateTibberBaseloadWatts(tibberData)
+        : null;
 
-  const cheapestWindows = findCheapestPriceWindows(
+  const haCheapest = findCheapestPriceWindows(
     priceEntity,
     config.gridFeePerKwh ?? 0,
   );
+  const cheapestWindows =
+    haCheapest.length > 0
+      ? haCheapest
+      : tibberData
+        ? findTibberCheapestWindows(tibberData, config.gridFeePerKwh ?? 0)
+        : [];
 
   return {
     period,

@@ -80,6 +80,7 @@ export interface EnergyHouseholdConfig {
   mainPowerEntityId: string | null;
   mainEnergyEntityId: string | null;
   priceEntityId: string | null;
+  tibberToken?: string | null;
   gridOperator: string | null;
   municipality: string | null;
   gridTariffSummary: string | null;
@@ -101,6 +102,7 @@ export const DEFAULT_ENERGY_CONFIG: EnergyHouseholdConfig = {
   mainPowerEntityId: null,
   mainEnergyEntityId: null,
   priceEntityId: null,
+  tibberToken: null,
   gridOperator: null,
   municipality: null,
   gridTariffSummary: null,

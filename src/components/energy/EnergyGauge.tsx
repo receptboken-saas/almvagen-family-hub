@@ -56,7 +56,13 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
           w.icon === "sys_tibber_pulse" ||
           w.unit?.toUpperCase() === "W" ||
           w.unit?.toLowerCase() === "kw",
-      ) ?? energyWidgets[0]
+      ) ??
+      energyWidgets.find(
+        (w) =>
+          w.icon !== "sys_elpris" &&
+          !w.unit?.toLowerCase().includes("kr") &&
+          !w.unit?.toLowerCase().includes("öre"),
+      )
     );
   }, [energyWidgets]);
 

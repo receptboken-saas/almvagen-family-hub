@@ -208,8 +208,10 @@ export function EnergyGeminiAdvisor({
             body: {
               action: "ask_house",
               property_id: propertyId,
-              question: prompt,
-              house_context: buildEnergyContext(),
+              payload: {
+                question: prompt,
+                house_context: buildEnergyContext(),
+              },
             },
           },
         );
@@ -255,8 +257,10 @@ export function EnergyGeminiAdvisor({
             body: {
               action: "ask_house",
               property_id: propertyId,
-              question: q,
-              house_context: buildEnergyContext(),
+              payload: {
+                question: q,
+                house_context: buildEnergyContext(),
+              },
             },
           },
         );

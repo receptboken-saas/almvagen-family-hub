@@ -28,6 +28,10 @@ import {
   type HAStatisticsMap,
 } from "@/lib/ha/energyStats";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
+import {
+  fetchTibberData,
+  type TibberSyncData,
+} from "@/lib/tibber/tibberClient";
 import type {
   DashboardWidget,
   Floor,
@@ -99,6 +103,7 @@ export function EnergyDashboard({
     DEFAULT_ENERGY_CONFIG,
   );
   const [statistics, setStatistics] = useState<HAStatisticsMap>({});
+  const [tibberData, setTibberData] = useState<TibberSyncData | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -178,6 +183,25 @@ export function EnergyDashboard({
     loadStatistics();
   }, [loadStatistics]);
 
+  useEffect(() => {
+    const token = config.tibberToken?.trim();
+    if (!token) {
+      setTibberData(null);
+      return;
+    }
+    let active = true;
+    fetchTibberData(token)
+      .then((res) => {
+        if (active) setTibberData(res);
+      })
+      .catch(() => {
+        // Keep existing state on transient Tibber API error
+      });
+    return () => {
+      active = false;
+    };
+  }, [config.tibberToken]);
+
   const summary = useMemo(
     () =>
       computeEnergyDashboard({
@@ -189,8 +213,9 @@ export function EnergyDashboard({
         dashboardWidgets: widgets,
         entities,
         statistics,
+        tibberData,
       }),
-    [period, config, floors, rooms, roomDevices, widgets, entities, statistics],
+    [period, config, floors, rooms, roomDevices, widgets, entities, statistics, tibberData],
   );
 
   const hasGaugeWidget = useMemo(

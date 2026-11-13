@@ -166,18 +166,20 @@ export function EnergyConfigModal({
       }>("gemini-hub-assistant", {
         body: {
           action: "ask_house",
-          question: prompt,
-          house_context: {
-            today: new Date().toISOString().slice(0, 10),
-            property: null,
-            ha_connected: isConnected,
-            rooms: [],
-            widgets: [],
-            weekly_events: [],
-            dinner_plans: [],
-            grid_operator: op,
-            municipality: muni,
-            main_fuse_amps: draft.mainFuseAmps,
+          payload: {
+            question: prompt,
+            house_context: {
+              today: new Date().toISOString().slice(0, 10),
+              property: null,
+              ha_connected: isConnected,
+              rooms: [],
+              widgets: [],
+              weekly_events: [],
+              dinner_plans: [],
+              grid_operator: op,
+              municipality: muni,
+              main_fuse_amps: draft.mainFuseAmps,
+            },
           },
         },
       });
@@ -581,6 +583,31 @@ export function EnergyConfigModal({
               <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-3.5 text-xs text-[var(--text-secondary)]">
                 Lämna fälten tomma om du vill att hubben automatiskt ska hitta
                 rätt sensor från dina energikort i Home Assistant.
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="tibber-token-input"
+                  className="text-xs font-semibold text-[var(--text-primary)]"
+                >
+                  Tibber API-token (rekommenderas för exakt månadssynk mot Tibber-appen)
+                </label>
+                <input
+                  id="tibber-token-input"
+                  type="password"
+                  value={draft.tibberToken ?? ""}
+                  onChange={(e) =>
+                    setDraft((p) => ({
+                      ...p,
+                      tibberToken: e.target.value.trim() || null,
+                    }))
+                  }
+                  placeholder="Klistra in din Personal Access Token från developer.tibber.com..."
+                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[#6B8E6B]"
+                />
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  Hämtar månadens exakta kWh, kostnad och dagens/morgondagens timpriser direkt från Tibber.
+                </p>
               </div>
 
               <div className="space-y-1.5">

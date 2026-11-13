@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.5] – 2026-11-13 (Direktsynk mot Tibber API, Gemini payload-fix & EnergyGauge-fix)
+- **Direktsynk mot Tibber GraphQL API (`tibberClient.ts`, `energyConfig.ts`, `energyEngine.ts`, `EnergyDashboard.tsx`, `EnergyConfigModal.tsx`):** Lade till valfri `Tibber API-token` under *Energiinställningar → Huvudmätare & Pris*. När den är ifylld hämtas exakta månadssiffror (kWh & kr från 1:a i månaden), timtoppar, nattlig baslast och dagens/morgondagens timpriser direkt från Tibber — så siffrorna matchar Tibber-appen även om Home Assistant-servern bara har ett par dagars lokal historik.
+- **Fix för Gemini Energirådgivare (`EnergyGeminiAdvisor.tsx`, `EnergyConfigModal.tsx`):** Wrappade `question` och `house_context` i `payload` precis som `gemini-hub-assistant` kräver, vilket löser `Cannot destructure property 'question' of 'payload'`.
+- **Fix för `EnergyGauge.tsx`:** Säkerställde att mätaren aldrig väljer en elprissensor (`kr`/`öre`) som effektmätare (`WATT`).
+
 ## [0.18.4] – 2026-11-13 (Fix för Tibber "Denna månad", timvägd kostnad & Gemini Edge Function)
 - **"Denna månad" i stället för rullande 30 dagar (`energyConfig.ts`, `energyStats.ts`, `EnergyDashboard.tsx`):** Räknar från den 1:a i innevarande månad kl 00:00 fram till nu så att kWh-totalen matchar Tibber-appens vy för innevarande månad.
 - **Exakt timvägd kostnadsberäkning (`energyStats.ts`, `energyEngine.ts`):** Hämtar även timhistorik för elprissensorn och multiplicerar varje timmes förbrukning (`kWh`) med just den timmens spotpris + nätavgift.
