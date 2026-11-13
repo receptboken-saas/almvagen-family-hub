@@ -44,7 +44,7 @@ export function HAEntityPicker({
     <div className="relative">
       <div className="relative">
         <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]"
           aria-hidden="true"
         />
         <input
@@ -60,7 +60,7 @@ export function HAEntityPicker({
             setIsOpen(true);
           }}
           placeholder={placeholder}
-          className="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-9 text-sm text-slate-100 placeholder-slate-600 focus:border-sky-500 focus:outline-none"
+          className="min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] py-2 pl-9 pr-9 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none"
         />
         <button
           type="button"
@@ -70,20 +70,20 @@ export function HAEntityPicker({
             setIsOpen((prev) => !prev);
           }}
           aria-label="Visa entiteter"
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:text-slate-200"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         >
           <ChevronDown className="h-4 w-4" />
         </button>
       </div>
 
       {isOpen && (
-        <div className="absolute z-30 mt-1.5 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-2xl">
+        <div className="absolute z-30 mt-1.5 max-h-60 w-full overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5 shadow-xl">
           {!isConnected ? (
-            <p className="px-3 py-2 text-xs text-slate-400">
+            <p className="px-3 py-2 text-xs text-[var(--text-secondary)]">
               HA ej ansluten – skriv in <code>entity_id</code> manuellt ovan.
             </p>
           ) : entityList.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-slate-400">
+            <p className="px-3 py-2 text-xs text-[var(--text-secondary)]">
               Inga matchande entiteter hittades.
             </p>
           ) : (
@@ -100,17 +100,17 @@ export function HAEntityPicker({
                   );
                   setIsOpen(false);
                 }}
-                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-slate-800"
+                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--bg-subtle)]"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-100">
+                  <p className="truncate font-medium text-[var(--text-primary)]">
                     {entity.attributes.friendly_name ?? entity.entity_id}
                   </p>
-                  <p className="truncate font-mono text-[11px] text-slate-400">
+                  <p className="truncate font-mono text-[11px] text-[var(--text-secondary)]">
                     {entity.entity_id}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-md bg-slate-950 px-2 py-0.5 font-mono text-[11px] text-sky-300">
+                <span className="shrink-0 rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 font-mono text-[11px] text-[#6B8E6B]">
                   {entity.state}
                 </span>
               </button>
