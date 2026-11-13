@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Thermometer, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Thermometer, X } from "lucide-react";
 import { DynamicIcon } from "@/components/ui/IconResolver";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
 import type { Room, RoomDevice } from "@/lib/supabase/types";
@@ -9,28 +9,58 @@ import { RoomDeviceControls } from "./RoomDeviceControls";
 import {
   bulkToggleRoomDevices,
   getRoomTemperatureDisplay,
+  groupRoomDevicesByTab,
   isControllableType,
+  type RoomTabId,
 } from "./roomHelpers";
 
 interface RoomDetailDrawerProps {
   room: Room | null;
   floorName?: string;
   devices: RoomDevice[];
+  isAdmin?: boolean;
   onClose: () => void;
+  onOpenAdmin?: () => void;
 }
 
+const TAB_LABELS: { id: RoomTabId; label: string }[] = [
+  { id: "lights", label: "Ljus & Brytare" },
+  { id: "climate", label: "Värme & Klimat" },
+  { id: "security", label: "Säkerhet & Sensorer" },
+  { id: "other", label: "Övrigt & Energi" },
+];
+
 /**
- * Responsive detail drawer (right slide-over on tablet/desktop, bottom-sheet on mobile)
- * displaying all devices in a room grouped by category with dimmer sliders and toggles.
+ * Responsive Room Hub drawer (bottom-sheet on mobile, slide-over on tablet/desktop)
+ * with dynamic functional tabs rendered only for device categories present in the room.
  */
 export function RoomDetailDrawer({
   room,
   floorName,
   devices,
+  isAdmin = false,
   onClose,
+  onOpenAdmin,
 }: RoomDetailDrawerProps) {
   const { isConnected, getEntity, callService } = useHomeAssistant();
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<RoomTabId>("lights");
+
+  const availableTabs = useMemo(() => {
+    const grouped = groupRoomDevicesByTab(devices, getEntity);
+    return TAB_LABELS.filter((tab) => grouped[tab.id].length > 0).map(
+      (tab) => ({
+        ...tab,
+        count: grouped[tab.id].length,
+      }),
+    );
+  }, [devices, getEntity]);
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(availableTabs[0].id);
+    }
+  }, [availableTabs, activeTab, room?.id]);
 
   useEffect(() => {
     if (!room) return;
@@ -115,7 +145,7 @@ export function RoomDetailDrawer({
             </button>
           </div>
 
-          {controllableDevices.length > 0 && (
+          {controllableDevices.length > 0 && activeTab === "lights" && (
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
@@ -135,11 +165,65 @@ export function RoomDetailDrawer({
               </button>
             </div>
           )}
+
+          {availableTabs.length > 1 && (
+            <div
+              role="tablist"
+              aria-label="Rumsfunktioner"
+              className="flex gap-1.5 overflow-x-auto pb-0.5"
+            >
+              {availableTabs.map((tab) => {
+                const isSelected = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      isSelected
+                        ? "bg-[#6B8E6B] text-white"
+                        : "border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className="tabular-nums opacity-75">
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
-          <RoomDeviceControls roomName={room.name} devices={devices} />
+          {devices.length === 0 && isAdmin && onOpenAdmin ? (
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-6 text-center">
+              <p className="text-sm text-[var(--text-secondary)]">
+                Inga enheter är kopplade till {room.name} ännu.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenAdmin();
+                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#6B8E6B] px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Öppna enhetskonfiguration</span>
+              </button>
+            </div>
+          ) : (
+            <RoomDeviceControls
+              roomName={room.name}
+              devices={devices}
+              activeTab={availableTabs.length > 0 ? activeTab : undefined}
+            />
+          )}
         </div>
       </div>
     </div>

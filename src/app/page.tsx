@@ -27,6 +27,7 @@ import { WasteScheduleCard } from "@/components/family/WasteScheduleCard";
 import { RoomCard } from "@/components/rooms/RoomCard";
 import { ChildRoomView } from "@/components/rooms/ChildRoomView";
 import { RoomDetailDrawer } from "@/components/rooms/RoomDetailDrawer";
+import { HomeSummariesBar } from "@/components/rooms/HomeSummariesBar";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { Card } from "@/components/ui/Card";
 import { DynamicIcon } from "@/components/ui/IconResolver";
@@ -202,6 +203,20 @@ export default function HomePage() {
           forceShowOnMobile={profile?.role === "tablet"}
         />
       )}
+
+      {!isChild &&
+        !childSingleRoom &&
+        activeView === "home" &&
+        data.properties.length > 0 && (
+          <HomeSummariesBar
+            rooms={visibleRooms}
+            roomDevices={data.roomDevices}
+            widgets={propertyWidgets}
+            isAdmin={isAdmin}
+            showEnergy={showEnergy}
+            onSelectEnergyView={() => setActiveView("energy")}
+          />
+        )}
 
       {!isChild &&
         !childSingleRoom &&
@@ -539,17 +554,59 @@ export default function HomePage() {
                         {isAdmin &&
                           " Öppna 'Redigera hemmet' för att lägga till våningar och rum."}
                       </Card>
+                    ) : selectedFloorId === "all" &&
+                      !isChild &&
+                      propertyFloors.length > 0 ? (
+                      <div className="space-y-6">
+                        {propertyFloors.map((floor) => {
+                          const floorRooms = visibleRooms.filter(
+                            (r) => r.floor_id === floor.id,
+                          );
+                          if (floorRooms.length === 0) return null;
+                          return (
+                            <div key={floor.id} className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <DynamicIcon
+                                  name={floor.icon ?? "layers"}
+                                  className="h-4 w-4 text-[#6B8E6B]"
+                                />
+                                <h3 className="font-display text-base font-semibold text-[var(--text-primary)]">
+                                  {floor.name}
+                                </h3>
+                                <span className="tabular-nums text-xs text-[var(--text-secondary)]">
+                                  ({floorRooms.length})
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                                {floorRooms.map((room) => (
+                                  <RoomCard
+                                    key={room.id}
+                                    room={room}
+                                    devices={data.roomDevices.filter(
+                                      (d) => d.room_id === room.id,
+                                    )}
+                                    isAdmin={isAdmin}
+                                    onSelect={() => setSelectedRoomId(room.id)}
+                                    onOpenAdmin={() => setIsAdminOpen(true)}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                         {visibleRooms.map((room) => (
                           <RoomCard
                             key={room.id}
                             room={room}
-                            floorName={floorNameById.get(room.floor_id)}
                             devices={data.roomDevices.filter(
                               (d) => d.room_id === room.id,
                             )}
+                            isAdmin={isAdmin}
                             onSelect={() => setSelectedRoomId(room.id)}
+                            onOpenAdmin={() => setIsAdminOpen(true)}
                           />
                         ))}
                       </div>
@@ -599,7 +656,9 @@ export default function HomePage() {
             ? data.roomDevices.filter((d) => d.room_id === selectedRoomId)
             : []
         }
+        isAdmin={isAdmin}
         onClose={() => setSelectedRoomId(null)}
+        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       {isAdmin && (

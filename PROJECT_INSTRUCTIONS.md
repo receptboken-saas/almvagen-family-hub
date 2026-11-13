@@ -15,7 +15,8 @@
 - **Inga hårdkodade hus, våningar, rum eller `entity_id` får någonsin finnas i koden.**
 - All struktur och alla enheter hämtas dynamiskt från Supabase och konfigureras via appens inbyggda Admin-gränssnitt (`src/components/admin/AdminPanel.tsx`).
 - All visuell ikonografi använder `IconResolver.tsx` + `CustomIcons.tsx` baserat på ikon-ID sparat i databasen.
-- **Steg A (Progressive Disclosure):** `RoomCard.tsx` visar enbart rumsikon, namn, kompakt statusrad (temperatur + tända lampor) och snabbknappar ("Tänd alla" / "Släck alla"). Klick på kortet öppnar `RoomDetailDrawer.tsx` (slide-over på surfplatta/desktop, bottom-sheet på mobil) med alla rummets enheter, ljusstyrkereglage och brytare.
+- **Steg A (Progressive Disclosure):** `RoomCard.tsx` är ett kompakt multi-funktionskort som enbart visar rummets namn, ikon, aktiva funktions-piller (temperatur/värme, tända lampor, säkerhet, media) och snabba "Tänd" / "Släck"-knappar. Klick på kortet öppnar `RoomDetailDrawer.tsx` som en flikindelad Rums-hubb (*Ljus & Brytare*, *Värme & Klimat* med 0.5°-termostatreglage, *Säkerhet & Sensorer*, *Övrigt & Energi*) där endast flikar med kopplade enheter visas.
+- **Hus-sammanfattningar (`HomeSummariesBar.tsx`):** Klickbar pill-rad (dold i `child`-läget) för snabb överblick över tända lampor per rum, klimatgenomsnitt, säkerhetssensorer och effektuttag. I läget "Alla våningar" grupperas rummen under våningsrubriker från Supabase.
 
 ---
 
