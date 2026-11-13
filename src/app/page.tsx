@@ -214,9 +214,11 @@ export default function HomePage() {
             rooms={visibleRooms}
             roomDevices={data.roomDevices}
             widgets={propertyWidgets}
+            weeklyEvents={data.weeklyEvents}
             isAdmin={isAdmin}
             showEnergy={showEnergy}
             onSelectEnergyView={() => setActiveView("energy")}
+            onSelectFamilyView={() => setActiveView("family")}
           />
         )}
 
@@ -374,11 +376,13 @@ export default function HomePage() {
                 )}
                 <WasteScheduleCard
                   propertyId={activeProperty?.id ?? null}
-                  userId={user.id}
-                  authorName={
-                    profile?.display_name || user.email || "Familjemedlem"
+                  weeklyEvents={data.weeklyEvents}
+                  householdSettings={
+                    data.householdSettings.find(
+                      (s) => s.property_id === activeProperty?.id,
+                    ) ?? null
                   }
-                  isAdmin={isAdmin}
+                  onDataChanged={refetch}
                 />
               </div>
 

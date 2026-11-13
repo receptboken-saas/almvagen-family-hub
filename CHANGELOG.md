@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.15.0] – 2026-11-13 (Smart Sophämtning med Kommun, Gemini-synk & 1–2 dagars påminnelse)
+- **Kommun- & kärlinställning direkt på kortet (`WasteScheduleCard.tsx`):** Visar sparad kommun från `household_settings`, har fällbar panel *"Ställ in kommun & kärl"* med textfält för kommun och område/kärl samt knappen *"Hämta schema med Gemini"* (`gemini-hub-assistant` med `action: 'sync_waste_schedule'`) och manuell knapp *"+ Lägg till enstaka tömning"*.
+- **Automatiska påminnelser 0, 1 och 2 dagar innan (`WasteScheduleCard.tsx`):** Visar de 4 närmaste kommande `waste`-händelserna från `weekly_events` med tydliga badges (*"Töms idag!"* med pulsande ikon, *"Imorgon – ställ ut tunnan!"*, *"Om 2 dagar"*) samt radering av enstaka rader.
+- **Startvy-påminnelse (`HomeSummariesBar.tsx`):** Visar en klickbar påminnelse-pill i hus-sammanfattningarna när en sophämtning ligger inom 0–2 dagar som leder direkt till *Familjen & Veckan*.
+
 ## [0.14.0] – 2026-11-13 (Taktil Post-it-anslagstavla med färgval & namnmärkning)
 - **Databas & Typer (`types.ts`):** Lade till `NoteColor` (`'ochre' | 'sage' | 'terracotta' | 'linen'`), `note_color`, `target_profile_id` och `target_name` på `FamilyNote`.
 - **Snabb Post-it-skapning (`FamilyBoard.tsx`):** Tog bort Gemini-kryssrutan för blixtsnabb inmatning med textfält (*"Skriv en kom-ihåg-lapp..."*), 4 färgprickar (*Honungsgul*, *Salviagrön*, *Terrakotta*, *Linnevit*), dynamiska mottagar-piller (`Alla` + familjeprofiler där `role !== 'tablet'`) och knappen **"+ Sätt upp"**.

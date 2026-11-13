@@ -8,11 +8,17 @@ import {
   ShieldCheck,
   ShieldAlert,
   Thermometer,
+  Trash2,
   X,
   Zap,
 } from "lucide-react";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
-import type { DashboardWidget, Room, RoomDevice } from "@/lib/supabase/types";
+import type {
+  DashboardWidget,
+  Room,
+  RoomDevice,
+  WeeklyEvent,
+} from "@/lib/supabase/types";
 import {
   bulkToggleRoomDevices,
   getRoomNumericTemperature,
@@ -24,9 +30,18 @@ interface HomeSummariesBarProps {
   rooms: Room[];
   roomDevices: RoomDevice[];
   widgets: DashboardWidget[];
+  weeklyEvents?: WeeklyEvent[];
   isAdmin: boolean;
   showEnergy: boolean;
   onSelectEnergyView?: () => void;
+  onSelectFamilyView?: () => void;
+}
+
+function diffDaysFromToday(dateStr: string): number {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(`${dateStr.slice(0, 10)}T00:00:00`);
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
 type ActiveSummaryModal = "lights" | "climate" | "security" | null;
@@ -39,9 +54,11 @@ export function HomeSummariesBar({
   rooms,
   roomDevices,
   widgets,
+  weeklyEvents = [],
   isAdmin,
   showEnergy,
   onSelectEnergyView,
+  onSelectFamilyView,
 }: HomeSummariesBarProps) {
   const { isConnected, getEntity, callService } = useHomeAssistant();
   const [openModal, setOpenModal] = useState<ActiveSummaryModal>(null);
@@ -180,6 +197,18 @@ export function HomeSummariesBar({
         }`
       : null;
 
+  const urgentWaste = useMemo(() => {
+    const candidates = weeklyEvents
+      .filter((ev) => ev.category === "waste")
+      .map((ev) => ({
+        event: ev,
+        diffDays: diffDaysFromToday(ev.start_date),
+      }))
+      .filter((item) => item.diffDays >= 0 && item.diffDays <= 2)
+      .sort((a, b) => a.diffDays - b.diffDays);
+    return candidates[0] ?? null;
+  }, [weeklyEvents]);
+
   async function turnOffAllLit() {
     if (!isConnected || totalLitCount === 0 || busy) return;
     setBusy(true);
@@ -267,6 +296,27 @@ export function HomeSummariesBar({
             <Zap className="h-3.5 w-3.5 text-[#D49A42]" aria-hidden="true" />
             <span className="tabular-nums">
               Energi: {powerText ?? "--"}
+            </span>
+          </button>
+        )}
+
+        {urgentWaste && (
+          <button
+            type="button"
+            onClick={onSelectFamilyView}
+            className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              urgentWaste.diffDays <= 1
+                ? "border-[#C86D51]/55 bg-[#C86D51]/15 text-[#C86D51] hover:bg-[#C86D51]/25"
+                : "border-[#D49A42]/55 bg-[#D49A42]/15 text-[#D49A42] hover:bg-[#D49A42]/25"
+            }`}
+          >
+            <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              {urgentWaste.diffDays === 0
+                ? `Idag: ${urgentWaste.event.title}`
+                : urgentWaste.diffDays === 1
+                  ? `Imorgon: ${urgentWaste.event.title}`
+                  : `Om 2 dagar: ${urgentWaste.event.title}`}
             </span>
           </button>
         )}
