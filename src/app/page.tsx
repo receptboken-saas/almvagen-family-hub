@@ -10,12 +10,20 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/supabase/useAuth";
 import { useHomeData } from "@/lib/supabase/useHomeData";
+import {
+  fetchProfileDefaultView,
+  type HubViewId,
+} from "@/lib/supabase/familyMeta";
 import { LoginScreen } from "@/components/auth/LoginScreen";
 import { Header } from "@/components/layout/Header";
+import { ViewTabs } from "@/components/layout/ViewTabs";
 import { EnergyOverview } from "@/components/energy/EnergyOverview";
 import { EnergyGauge } from "@/components/energy/EnergyGauge";
 import { QuickScenes } from "@/components/energy/QuickScenes";
 import { FamilyBoard } from "@/components/family/FamilyBoard";
+import { FamilyCalendarCard } from "@/components/family/FamilyCalendarCard";
+import { DinnerPlannerCard } from "@/components/family/DinnerPlannerCard";
+import { WasteScheduleCard } from "@/components/family/WasteScheduleCard";
 import { RoomCard } from "@/components/rooms/RoomCard";
 import { ChildRoomView } from "@/components/rooms/ChildRoomView";
 import { RoomDetailDrawer } from "@/components/rooms/RoomDetailDrawer";
@@ -46,6 +54,7 @@ export default function HomePage() {
     null,
   );
   const [selectedFloorId, setSelectedFloorId] = useState<string>("all");
+  const [activeView, setActiveView] = useState<HubViewId>("home");
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
@@ -80,6 +89,24 @@ export default function HomePage() {
       setSelectedFloorId("all");
     }
   }, [profile?.id, profile?.default_floor_id, propertyFloors]);
+
+  useEffect(() => {
+    if (!profile?.id || profile.role === "child") {
+      setActiveView("home");
+      return;
+    }
+    let cancelled = false;
+    void fetchProfileDefaultView(profile.id, activeProperty?.id ?? null).then(
+      (preferred) => {
+        if (!cancelled) {
+          setActiveView(preferred ?? "home");
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, profile?.role, activeProperty?.id]);
 
   const floorNameById = useMemo(
     () => new Map(propertyFloors.map((f) => [f.id, f.name])),
@@ -168,11 +195,37 @@ export default function HomePage() {
         onSignOut={signOut}
       />
 
-      {!isChild && propertyFloors.length > 0 && !childSingleRoom && (
-        <nav
-          aria-label="Våningar"
-          className="-mt-1 flex gap-2 overflow-x-auto pb-1 lg:hidden"
-        >
+      {!isChild && !childSingleRoom && data.properties.length > 0 && (
+        <ViewTabs
+          activeView={activeView}
+          onChangeView={setActiveView}
+          forceShowOnMobile={profile?.role === "tablet"}
+        />
+      )}
+
+      {!isChild &&
+        !childSingleRoom &&
+        activeView === "home" &&
+        showEnergy &&
+        data.properties.length > 0 && (
+          <div className="sm:hidden">
+            <EnergyOverview
+              widgets={propertyWidgets}
+              isAdmin={isAdmin}
+              compactPills
+              onOpenAdmin={() => setIsAdminOpen(true)}
+            />
+          </div>
+        )}
+
+      {!isChild &&
+        propertyFloors.length > 0 &&
+        !childSingleRoom &&
+        activeView === "home" && (
+          <nav
+            aria-label="Våningar"
+            className="-mt-1 flex gap-2 overflow-x-auto pb-1 lg:hidden"
+          >
           <button
             type="button"
             onClick={() => setSelectedFloorId("all")}
@@ -266,51 +319,21 @@ export default function HomePage() {
                 />
               )}
             </div>
-          ) : (
-            <>
-              {showEnergy && (
-                <section aria-labelledby="energy-heading" className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2
-                      id="energy-heading"
-                      className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
-                    >
-                      Översikt &amp; Energi
-                    </h2>
-                    <span className="text-xs text-[var(--text-secondary)]">
-                      Realtidsdata via HA
-                    </span>
-                  </div>
-
-                  <div
-                    className={`grid grid-cols-1 gap-4 ${
-                      hasEnergyGaugeWidget ? "lg:grid-cols-12" : ""
-                    }`}
-                  >
-                    {hasEnergyGaugeWidget && (
-                      <div className="lg:col-span-4">
-                        <EnergyGauge
-                          widgets={propertyWidgets}
-                          isAdmin={isAdmin}
-                        />
-                      </div>
-                    )}
-                    <div className={hasEnergyGaugeWidget ? "lg:col-span-8" : ""}>
-                      <EnergyOverview
-                        widgets={propertyWidgets}
-                        isAdmin={isAdmin}
-                      />
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {showScenes && (
-                <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
-              )}
-
-              {showFamilyBoard && (
-                <FamilyBoard
+          ) : activeView === "family" && !isChild ? (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+              <div className="space-y-6">
+                {showFamilyBoard && (
+                  <FamilyBoard
+                    propertyId={activeProperty?.id ?? null}
+                    userId={user.id}
+                    authorName={
+                      profile?.display_name || user.email || "Familjemedlem"
+                    }
+                    isAdmin={isAdmin}
+                    singleColumnCards
+                  />
+                )}
+                <WasteScheduleCard
                   propertyId={activeProperty?.id ?? null}
                   userId={user.id}
                   authorName={
@@ -318,6 +341,143 @@ export default function HomePage() {
                   }
                   isAdmin={isAdmin}
                 />
+              </div>
+
+              <div className="space-y-6">
+                <DinnerPlannerCard
+                  propertyId={activeProperty?.id ?? null}
+                  userId={user.id}
+                  authorName={
+                    profile?.display_name || user.email || "Familjemedlem"
+                  }
+                  canEdit={true}
+                />
+                <FamilyCalendarCard
+                  propertyId={activeProperty?.id ?? null}
+                  userId={user.id}
+                  authorName={
+                    profile?.display_name || user.email || "Familjemedlem"
+                  }
+                  isAdmin={isAdmin}
+                />
+              </div>
+            </div>
+          ) : activeView === "energy" && !isChild ? (
+            <div className="space-y-6">
+              <section aria-labelledby="energy-deep-heading" className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2
+                    id="energy-deep-heading"
+                    className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
+                  >
+                    Energi, Laddning &amp; Klimat
+                  </h2>
+                  <span className="text-xs text-[var(--text-secondary)]">
+                    Realtidsdata via HA
+                  </span>
+                </div>
+
+                <div
+                  className={`grid grid-cols-1 gap-4 ${
+                    hasEnergyGaugeWidget ? "lg:grid-cols-12" : ""
+                  }`}
+                >
+                  {hasEnergyGaugeWidget && (
+                    <div className="lg:col-span-4">
+                      <EnergyGauge
+                        widgets={propertyWidgets}
+                        isAdmin={isAdmin}
+                      />
+                    </div>
+                  )}
+                  <div className={hasEnergyGaugeWidget ? "lg:col-span-8" : ""}>
+                    <EnergyOverview
+                      widgets={propertyWidgets}
+                      isAdmin={isAdmin}
+                      onOpenAdmin={() => setIsAdminOpen(true)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {showScenes && (
+                <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Mobile (< 640px): QuickScenes + compact collapsible FamilyBoard (Energy pills are at the very top) */}
+              <div className="space-y-4 sm:hidden">
+                {showScenes && (
+                  <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+                )}
+                {showFamilyBoard && (
+                  <FamilyBoard
+                    propertyId={activeProperty?.id ?? null}
+                    userId={user.id}
+                    authorName={
+                      profile?.display_name || user.email || "Familjemedlem"
+                    }
+                    isAdmin={isAdmin}
+                  />
+                )}
+              </div>
+
+              {/* Unfolded Fold 8 / Mini-tablet (640px - 1024px): 2-column Overview+Scenes (left) & FamilyBoard (right) */}
+              {(showEnergy || showScenes || showFamilyBoard) && !isChild && (
+                <div className="hidden gap-5 sm:grid sm:grid-cols-2 sm:items-start lg:hidden">
+                  {(showEnergy || showScenes) && (
+                    <div className="space-y-4">
+                      {showEnergy && (
+                        <section aria-labelledby="energy-fold-heading" className="space-y-3">
+                          <h2
+                            id="energy-fold-heading"
+                            className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
+                          >
+                            Husets puls
+                          </h2>
+                          <EnergyOverview
+                            widgets={propertyWidgets}
+                            isAdmin={isAdmin}
+                            onOpenAdmin={() => setIsAdminOpen(true)}
+                          />
+                        </section>
+                      )}
+                      {showScenes && (
+                        <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+                      )}
+                    </div>
+                  )}
+
+                  {showFamilyBoard && (
+                    <FamilyBoard
+                      propertyId={activeProperty?.id ?? null}
+                      userId={user.id}
+                      authorName={
+                        profile?.display_name || user.email || "Familjemedlem"
+                      }
+                      isAdmin={isAdmin}
+                      singleColumnCards
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Wall Tablet / Desktop (>= 1024px): Compact House Pulse + QuickScenes row */}
+              {(showEnergy || showScenes) && (
+                <div className="hidden space-y-4 lg:block">
+                  {showEnergy && (
+                    <EnergyOverview
+                      widgets={propertyWidgets}
+                      isAdmin={isAdmin}
+                      compactPills
+                      onOpenAdmin={() => setIsAdminOpen(true)}
+                    />
+                  )}
+                  {showScenes && (
+                    <QuickScenes widgets={propertyWidgets} isAdmin={isAdmin} />
+                  )}
+                </div>
               )}
 
               <section aria-labelledby="rooms-heading" className="space-y-4">

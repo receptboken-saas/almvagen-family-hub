@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Check, Pin, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Pin, Plus, Trash2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { isSystemFamilyNote } from "@/lib/supabase/familyMeta";
 import type { FamilyNote, Profile } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/Card";
 import { AvatarBadge } from "@/components/ui/AvatarBadge";
@@ -12,6 +13,7 @@ interface FamilyBoardProps {
   userId: string;
   authorName: string;
   isAdmin: boolean;
+  singleColumnCards?: boolean;
 }
 
 const NOTE_ACCENTS = [
@@ -38,6 +40,7 @@ export function FamilyBoard({
   userId,
   authorName,
   isAdmin,
+  singleColumnCards = false,
 }: FamilyBoardProps) {
   const [notes, setNotes] = useState<FamilyNote[]>([]);
   const [avatarsByAuthor, setAvatarsByAuthor] = useState<
@@ -45,6 +48,8 @@ export function FamilyBoard({
   >({});
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [mobileShowForm, setMobileShowForm] = useState(false);
 
   const loadNotes = useCallback(async () => {
     const supabase = getSupabaseClient();
@@ -68,7 +73,10 @@ export function FamilyBoard({
     ]);
 
     if (!notesRes.error && notesRes.data) {
-      setNotes(notesRes.data as FamilyNote[]);
+      const humanNotes = (notesRes.data as FamilyNote[]).filter(
+        (n) => !isSystemFamilyNote(n.content),
+      );
+      setNotes(humanNotes);
     }
     if (!profRes.error && profRes.data) {
       const map: Record<
@@ -141,33 +149,73 @@ export function FamilyBoard({
     await supabase.from("family_notes").delete().eq("id", noteId);
   }
 
+  const activeCount = notes.filter((n) => !n.is_done).length;
+
   return (
-    <section aria-labelledby="family-board-heading" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2
-          id="family-board-heading"
-          className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
+    <section aria-labelledby="family-board-heading" className="space-y-3 sm:space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setMobileExpanded((prev) => !prev)}
+          aria-expanded={mobileExpanded}
+          className="flex items-center gap-2 text-left sm:pointer-events-none"
         >
-          Familjens anslagstavla
-        </h2>
-        <span className="tabular-nums text-xs text-[var(--text-secondary)]">
-          {notes.filter((n) => !n.is_done).length} aktiva lappar
+          <h2
+            id="family-board-heading"
+            className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
+          >
+            Familjens anslagstavla
+          </h2>
+          <span className="tabular-nums rounded-full bg-[var(--bg-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+            {activeCount}
+          </span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-[var(--text-secondary)] transition-transform sm:hidden ${
+              mobileExpanded ? "rotate-180" : ""
+            }`}
+            aria-hidden="true"
+          />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMobileExpanded(true);
+            setMobileShowForm((prev) => !prev);
+          }}
+          className="inline-flex min-h-9 items-center gap-1 rounded-full border border-[#6B8E6B]/40 bg-[#6B8E6B]/12 px-3 py-1 text-xs font-semibold text-[#6B8E6B] sm:hidden"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>Lapp</span>
+        </button>
+
+        <span className="tabular-nums hidden text-xs text-[var(--text-secondary)] sm:inline">
+          {activeCount} aktiva lappar
         </span>
       </div>
 
-      <Card className="space-y-4">
-        <form onSubmit={handleAddNote} className="flex flex-col gap-2.5 sm:flex-row">
+      <Card
+        className={`space-y-4 ${
+          mobileExpanded ? "block" : "hidden sm:block"
+        }`}
+      >
+        <form
+          onSubmit={handleAddNote}
+          className={`${
+            mobileShowForm ? "flex" : "hidden sm:flex"
+          } flex-col gap-2.5 sm:flex-row`}
+        >
           <input
             type="text"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Skriv en lapp eller kom-ihåg (t.ex. Träning kl 17:30, Köp mjölk)…"
-            className="min-h-12 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none"
+            className="min-h-11 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none sm:min-h-12"
           />
           <button
             type="submit"
             disabled={busy || !content.trim()}
-            className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#6B8E6B] px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#6B8E6B] px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-12"
           >
             <Plus className="h-4 w-4" />
             <span>Sätt upp lapp</span>
@@ -179,7 +227,11 @@ export function FamilyBoard({
             Anslagstavlan är tom – skriv en kom-ihåg ovan!
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div
+            className={`grid grid-cols-1 gap-3 ${
+              singleColumnCards ? "" : "sm:grid-cols-2 lg:grid-cols-3"
+            }`}
+          >
             {notes.map((note, idx) => {
               const canDelete = isAdmin || note.author_id === userId;
               const accentClass = note.is_pinned

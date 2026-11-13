@@ -2,6 +2,12 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.8.0] – 2026-11-13 (Kompakta Widgets, Fönsterväljare & Familjemoduler)
+- **Kompakta översikts-widgets & anslagstavla:** Döljer tom widget-platshållare för icke-admin (endast diskret `+ Lägg till widget`-knapp för admin), kompakt horisontell pill-rad högst upp på `< 640px` i `EnergyOverview.tsx`, fällbar/kompakt `FamilyBoard.tsx` på mobil med `+ Lapp`-knapp, samt balanserat 2-spalts rutnät för *Översikt & Snabbscener* + *Anslagstavla* på uppfälld Fold 8 (`640px–1024px`).
+- **Fönsterväljare (`ViewTabs.tsx`):** Taktil flikväljare direkt under toppmenyn på surfplattor (`role === 'tablet'`) och större skärmar (`>= 768px`) med vyerna *Hem & Styrning*, *Familjen & Veckan* och *Energi & Drift*.
+- **Valbart startfönster:** Admin kan nu välja startfönster per profil/väggplatta i `AdminPanel.tsx` (sparat datadrivet via `familyMeta.ts` i Supabase `family_notes` + `localStorage`).
+- **Förberedda Familjemoduler (`src/components/family/`):** Lade till `FamilyCalendarCard.tsx` (Familjekalender & Lovdagar), `DinnerPlannerCard.tsx` ("Vad blir det till middag?" med inline-redigering) och `WasteScheduleCard.tsx` (Sophämtning med påminnelsebadge kvällen före tömning).
+
 ## [0.7.0] – 2026-11-13 (Minimalistisk Toppmeny & Responsiv Layout)
 - **Minimalistisk Toppmeny (`Header.tsx`):** Bantade sidhuvudet till en enda ren rad (56–64 px) med husets namn i `Fraunces` + diskret HA-statusprick till vänster (klickbar för `admin` för att öppna `HAConfigModal`) och två ankarpunkter till höger: kompakt `ThemeToggle` och Profil-pill.
 - **Profil-snabbmeny (`ProfileQuickMenu.tsx`):** Ny responsiv meny (popover på tablet/desktop, bottom-sheet på mobil) med *Byt profil / panel*, *Min profil & avatar*, *Redigera hemmet* (admin), *HA-anslutning & status* (admin) samt *Logga ut* med Admin-PIN-skydd när aktiv profil är `tablet`.

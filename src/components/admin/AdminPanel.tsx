@@ -18,6 +18,12 @@ import {
   X,
 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import {
+  fetchProfileDefaultView,
+  HUB_VIEW_OPTIONS,
+  saveProfileDefaultView,
+  type HubViewId,
+} from "@/lib/supabase/familyMeta";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
 import type { HAEntityState } from "@/lib/ha/types";
 import {
@@ -158,6 +164,7 @@ export function AdminPanel({
     null,
   );
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [editingDefaultView, setEditingDefaultView] = useState<HubViewId>("home");
 
   useEffect(() => {
     const defaultProp = activePropertyId ?? data.properties[0]?.id ?? "";
@@ -694,6 +701,11 @@ export function AdminPanel({
     if (error) {
       setFeedback(`Kunde inte spara profil: ${error.message}`);
     } else {
+      await saveProfileDefaultView(
+        editingProfile.id,
+        activePropertyId,
+        editingDefaultView,
+      );
       setFeedback("Profilen sparades.");
       await loadProfiles();
       await onDataChanged();
@@ -735,6 +747,10 @@ export function AdminPanel({
         show_energy: profile.show_energy ?? true,
         show_scenes: profile.show_scenes ?? true,
         show_family_board: profile.show_family_board ?? true,
+      });
+      setEditingDefaultView("home");
+      void fetchProfileDefaultView(profile.id, activePropertyId).then((v) => {
+        if (v) setEditingDefaultView(v);
       });
     }
   }
@@ -2527,6 +2543,27 @@ export function AdminPanel({
                               </select>
                             </div>
                           </div>
+
+                          {draft.role !== "child" && (
+                            <div>
+                              <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">
+                                Startfönster (surfplatta &amp; stor skärm)
+                              </label>
+                              <select
+                                value={editingDefaultView}
+                                onChange={(e) =>
+                                  setEditingDefaultView(e.target.value as HubViewId)
+                                }
+                                className={inputClass}
+                              >
+                                {HUB_VIEW_OPTIONS.map((opt) => (
+                                  <option key={opt.id} value={opt.id}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
 
                           <IconPicker
                             context="avatar"
