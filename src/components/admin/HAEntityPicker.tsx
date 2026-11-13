@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
+import type { HAEntityState } from "@/lib/ha/types";
 
 interface HAEntityPickerProps {
   value: string;
@@ -10,6 +11,7 @@ interface HAEntityPickerProps {
     entityId: string,
     friendlyName?: string,
     unit?: string,
+    entity?: HAEntityState,
   ) => void;
   placeholder?: string;
 }
@@ -56,7 +58,14 @@ export function HAEntityPicker({
             setTimeout(() => setIsOpen(false), 180);
           }}
           onChange={(e) => {
-            onChange(e.target.value);
+            const nextVal = e.target.value;
+            const matched = entities[nextVal.trim()];
+            onChange(
+              nextVal,
+              matched?.attributes.friendly_name,
+              matched?.attributes.unit_of_measurement,
+              matched,
+            );
             setIsOpen(true);
           }}
           placeholder={placeholder}
@@ -97,6 +106,7 @@ export function HAEntityPicker({
                     entity.entity_id,
                     entity.attributes.friendly_name,
                     entity.attributes.unit_of_measurement,
+                    entity,
                   );
                   setIsOpen(false);
                 }}

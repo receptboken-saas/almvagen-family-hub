@@ -18,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
+import type { HAEntityState } from "@/lib/ha/types";
 import {
   PROFILE_SELECT_COLUMNS,
   type DashboardWidget,
@@ -34,6 +36,7 @@ import { AvatarBadge } from "@/components/ui/AvatarBadge";
 import { DynamicIcon } from "@/components/ui/IconResolver";
 import { HAEntityPicker } from "./HAEntityPicker";
 import { IconPicker } from "./IconPicker";
+import { inferHAConfig } from "./haAutoConfig";
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -84,6 +87,8 @@ export function AdminPanel({
   activePropertyId,
   onDataChanged,
 }: AdminPanelProps) {
+  const { isConnected: haConnected, entities: haEntities } =
+    useHomeAssistant();
   const [tab, setTab] = useState<AdminTab>("rooms");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -112,19 +117,25 @@ export function AdminPanel({
   // Inline device form inside expanded room
   const [inlineEntityId, setInlineEntityId] = useState("");
   const [inlineDeviceName, setInlineDeviceName] = useState("");
+  const [inlineNameEdited, setInlineNameEdited] = useState(false);
   const [inlineDeviceType, setInlineDeviceType] = useState<WidgetType>("light");
+  const [batchOpenRoomId, setBatchOpenRoomId] = useState<string | null>(null);
+  const [batchSearch, setBatchSearch] = useState("");
+  const [batchSelectedIds, setBatchSelectedIds] = useState<string[]>([]);
 
   // Device form (All devices tab)
   const [deviceRoomId, setDeviceRoomId] = useState("");
   const [deviceFilterRoomId, setDeviceFilterRoomId] = useState<string>("all");
   const [deviceEntityId, setDeviceEntityId] = useState("");
   const [deviceName, setDeviceName] = useState("");
+  const [deviceNameEdited, setDeviceNameEdited] = useState(false);
   const [deviceType, setDeviceType] = useState<WidgetType>("light");
   const [editingDevice, setEditingDevice] = useState<RoomDevice | null>(null);
 
   // Widget form
   const [widgetPropId, setWidgetPropId] = useState("");
   const [widgetTitle, setWidgetTitle] = useState("");
+  const [widgetTitleEdited, setWidgetTitleEdited] = useState(false);
   const [widgetSubtitle, setWidgetSubtitle] = useState("");
   const [widgetEntityId, setWidgetEntityId] = useState("");
   const [widgetUnit, setWidgetUnit] = useState("");
@@ -445,6 +456,34 @@ export function AdminPanel({
     if (ok) {
       setInlineEntityId("");
       setInlineDeviceName("");
+      setInlineNameEdited(false);
+    }
+  }
+
+  async function handleBatchAddDevices(room: Room) {
+    const supabase = getSupabaseClient();
+    if (!supabase || batchSelectedIds.length === 0) return;
+    const existingCount = (devicesByRoom.get(room.id) ?? []).length;
+    const rows = batchSelectedIds.map((entityId, idx) => {
+      const entity = haEntities[entityId];
+      const inferred = inferHAConfig(entityId, entity, room.name);
+      return {
+        room_id: room.id,
+        ha_entity_id: entityId,
+        display_name: inferred.displayName,
+        widget_type: inferred.widgetType,
+        sort_order: existingCount + idx,
+      };
+    });
+
+    const ok = await runMutation(() =>
+      supabase.from("room_devices").insert(rows),
+    );
+    if (ok) {
+      setBatchSelectedIds([]);
+      setBatchOpenRoomId(null);
+      setBatchSearch("");
+      setFeedback(`${rows.length} enheter lades till i ${room.name}.`);
     }
   }
 
@@ -471,6 +510,7 @@ export function AdminPanel({
     if (ok) {
       setDeviceEntityId("");
       setDeviceName("");
+      setDeviceNameEdited(false);
     }
   }
 
@@ -528,6 +568,7 @@ export function AdminPanel({
     if (ok) {
       setWidgetEntityId("");
       setWidgetTitle("");
+      setWidgetTitleEdited(false);
       setWidgetSubtitle("");
       setWidgetUnit("");
     }
@@ -1182,15 +1223,24 @@ export function AdminPanel({
                                               value={inlineEntityId}
                                               onChange={(
                                                 entityId,
-                                                friendlyName,
+                                                _friendlyName,
+                                                _unit,
+                                                entity?: HAEntityState,
                                               ) => {
                                                 setInlineEntityId(entityId);
-                                                if (
-                                                  friendlyName &&
-                                                  !inlineDeviceName
-                                                ) {
-                                                  setInlineDeviceName(
-                                                    friendlyName,
+                                                if (entity || entityId.includes(".")) {
+                                                  const inferred = inferHAConfig(
+                                                    entityId,
+                                                    entity,
+                                                    r.name,
+                                                  );
+                                                  if (!inlineNameEdited || !inlineDeviceName) {
+                                                    setInlineDeviceName(
+                                                      inferred.displayName,
+                                                    );
+                                                  }
+                                                  setInlineDeviceType(
+                                                    inferred.widgetType,
                                                   );
                                                 }
                                               }}
@@ -1202,11 +1252,14 @@ export function AdminPanel({
                                               type="text"
                                               required
                                               value={inlineDeviceName}
-                                              onChange={(e) =>
+                                              onChange={(e) => {
                                                 setInlineDeviceName(
                                                   e.target.value,
-                                                )
-                                              }
+                                                );
+                                                setInlineNameEdited(
+                                                  Boolean(e.target.value.trim()),
+                                                );
+                                              }}
                                               placeholder="Namn i rummet"
                                               className={inputClass}
                                             />
@@ -1236,6 +1289,181 @@ export function AdminPanel({
                                             <Plus className="h-3.5 w-3.5" /> Lägg till
                                           </button>
                                         </form>
+
+                                        {/* Snabb-lägg till flera enheter */}
+                                        <div className="space-y-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (batchOpenRoomId === r.id) {
+                                                setBatchOpenRoomId(null);
+                                              } else {
+                                                setBatchOpenRoomId(r.id);
+                                                setBatchSelectedIds([]);
+                                                setBatchSearch("");
+                                              }
+                                            }}
+                                            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-primary)] hover:border-[#6B8E6B]"
+                                          >
+                                            <Plus className="h-3.5 w-3.5 text-[#6B8E6B]" />
+                                            <span>
+                                              {batchOpenRoomId === r.id
+                                                ? "Stäng snabbval"
+                                                : "Snabb-lägg till flera enheter"}
+                                            </span>
+                                          </button>
+
+                                          {batchOpenRoomId === r.id && (
+                                            <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
+                                              {!haConnected ? (
+                                                <p className="text-xs text-[var(--text-secondary)]">
+                                                  Anslut till Home Assistant först för att hämta och bocka i flera entiteter samtidigt.
+                                                </p>
+                                              ) : (
+                                                <>
+                                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <input
+                                                      type="text"
+                                                      value={batchSearch}
+                                                      onChange={(e) =>
+                                                        setBatchSearch(
+                                                          e.target.value,
+                                                        )
+                                                      }
+                                                      placeholder="Filtrera HA-entiteter (t.ex. vardagsrum eller light.)…"
+                                                      className="min-h-9 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-xs text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+                                                    />
+                                                    <button
+                                                      type="button"
+                                                      disabled={
+                                                        busy ||
+                                                        batchSelectedIds.length ===
+                                                          0
+                                                      }
+                                                      onClick={() =>
+                                                        handleBatchAddDevices(r)
+                                                      }
+                                                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#6B8E6B] px-3 text-xs font-semibold text-white hover:bg-[#5B7D5B] disabled:opacity-40"
+                                                    >
+                                                      <Check className="h-3.5 w-3.5" />
+                                                      <span>
+                                                        Lägg till valda (
+                                                        {batchSelectedIds.length}
+                                                        )
+                                                      </span>
+                                                    </button>
+                                                  </div>
+
+                                                  <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
+                                                    {Object.values(haEntities)
+                                                      .filter((e) => {
+                                                        const q = batchSearch
+                                                          .toLowerCase()
+                                                          .trim();
+                                                        if (!q) return true;
+                                                        return (
+                                                          e.entity_id
+                                                            .toLowerCase()
+                                                            .includes(q) ||
+                                                          (
+                                                            e.attributes
+                                                              .friendly_name ??
+                                                            ""
+                                                          )
+                                                            .toLowerCase()
+                                                            .includes(q)
+                                                        );
+                                                      })
+                                                      .sort((a, b) =>
+                                                        a.entity_id.localeCompare(
+                                                          b.entity_id,
+                                                        ),
+                                                      )
+                                                      .slice(0, 80)
+                                                      .map((entity) => {
+                                                        const alreadyInRoom =
+                                                          roomDevices.some(
+                                                            (d) =>
+                                                              d.ha_entity_id ===
+                                                              entity.entity_id,
+                                                          );
+                                                        const checked =
+                                                          batchSelectedIds.includes(
+                                                            entity.entity_id,
+                                                          );
+                                                        const inferred =
+                                                          inferHAConfig(
+                                                            entity.entity_id,
+                                                            entity,
+                                                            r.name,
+                                                          );
+
+                                                        return (
+                                                          <label
+                                                            key={entity.entity_id}
+                                                            className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs ${
+                                                              alreadyInRoom
+                                                                ? "opacity-45"
+                                                                : "hover:bg-[var(--bg-subtle)]"
+                                                            }`}
+                                                          >
+                                                            <div className="flex min-w-0 items-center gap-2">
+                                                              <input
+                                                                type="checkbox"
+                                                                disabled={
+                                                                  alreadyInRoom
+                                                                }
+                                                                checked={
+                                                                  checked
+                                                                }
+                                                                onChange={() =>
+                                                                  setBatchSelectedIds(
+                                                                    (prev) =>
+                                                                      prev.includes(
+                                                                        entity.entity_id,
+                                                                      )
+                                                                        ? prev.filter(
+                                                                            (
+                                                                              id,
+                                                                            ) =>
+                                                                              id !==
+                                                                              entity.entity_id,
+                                                                          )
+                                                                        : [
+                                                                            ...prev,
+                                                                            entity.entity_id,
+                                                                          ],
+                                                                  )
+                                                                }
+                                                                className="h-4 w-4 accent-[#6B8E6B]"
+                                                              />
+                                                              <div className="min-w-0">
+                                                                <p className="truncate font-medium text-[var(--text-primary)]">
+                                                                  {
+                                                                    inferred.displayName
+                                                                  }
+                                                                </p>
+                                                                <p className="truncate font-mono text-[10px] text-[var(--text-secondary)]">
+                                                                  {
+                                                                    entity.entity_id
+                                                                  }
+                                                                </p>
+                                                              </div>
+                                                            </div>
+                                                            <span className="shrink-0 rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-medium text-[#6B8E6B]">
+                                                              {alreadyInRoom
+                                                                ? "Tillagd"
+                                                                : inferred.widgetType}
+                                                            </span>
+                                                          </label>
+                                                        );
+                                                      })}
+                                                  </div>
+                                                </>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   )}
@@ -1537,10 +1765,24 @@ export function AdminPanel({
                 <div className="sm:col-span-2">
                   <HAEntityPicker
                     value={deviceEntityId}
-                    onChange={(entityId, friendlyName) => {
+                    onChange={(
+                      entityId,
+                      _friendlyName,
+                      _unit,
+                      entity?: HAEntityState,
+                    ) => {
                       setDeviceEntityId(entityId);
-                      if (friendlyName && !deviceName) {
-                        setDeviceName(friendlyName);
+                      if (entity || entityId.includes(".")) {
+                        const roomLabel = roomNameMap.get(deviceRoomId);
+                        const inferred = inferHAConfig(
+                          entityId,
+                          entity,
+                          roomLabel,
+                        );
+                        if (!deviceNameEdited || !deviceName) {
+                          setDeviceName(inferred.displayName);
+                        }
+                        setDeviceType(inferred.widgetType);
                       }
                     }}
                   />
@@ -1549,7 +1791,10 @@ export function AdminPanel({
                   type="text"
                   required
                   value={deviceName}
-                  onChange={(e) => setDeviceName(e.target.value)}
+                  onChange={(e) => {
+                    setDeviceName(e.target.value);
+                    setDeviceNameEdited(Boolean(e.target.value.trim()));
+                  }}
                   placeholder="Visningsnamn (t.ex. Taklampa)"
                   className={`${inputClass} sm:col-span-2`}
                 />
@@ -1770,11 +2015,24 @@ export function AdminPanel({
                   <HAEntityPicker
                     value={widgetEntityId}
                     placeholder="Sök HA-entitet (t.ex. sensor.tibber_pulse_power)"
-                    onChange={(entityId, friendlyName, unit) => {
+                    onChange={(
+                      entityId,
+                      _friendlyName,
+                      _unit,
+                      entity?: HAEntityState,
+                    ) => {
                       setWidgetEntityId(entityId);
-                      if (friendlyName && !widgetTitle)
-                        setWidgetTitle(friendlyName);
-                      if (unit && !widgetUnit) setWidgetUnit(unit);
+                      if (entity || entityId.includes(".")) {
+                        const inferred = inferHAConfig(entityId, entity);
+                        if (!widgetTitleEdited || !widgetTitle) {
+                          setWidgetTitle(inferred.displayName);
+                        }
+                        if (inferred.unit) {
+                          setWidgetUnit(inferred.unit);
+                        }
+                        setWidgetCategory(inferred.widgetCategory);
+                        setWidgetIcon(inferred.icon);
+                      }
                     }}
                   />
                 </div>
@@ -1782,7 +2040,10 @@ export function AdminPanel({
                   type="text"
                   required
                   value={widgetTitle}
-                  onChange={(e) => setWidgetTitle(e.target.value)}
+                  onChange={(e) => {
+                    setWidgetTitle(e.target.value);
+                    setWidgetTitleEdited(Boolean(e.target.value.trim()));
+                  }}
                   placeholder="Rubrik (t.ex. Tibber Pulse)"
                   className={inputClass}
                 />

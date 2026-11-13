@@ -4,4 +4,5 @@ Se `PROJECT_INSTRUCTIONS.md`, `DESIGN_SYSTEM.md` och `AGENTS.md` för fullständ
 
 ## Riktlinjer
 - TypeScript `strict: true`, noll hårdkodade rum/enheter, fullt stöd för båda temana (`light` / `dark` / `auto`).
+- Uppdatera alltid `CHANGELOG.md` (och vid behov `BACKLOG.md`) vid nya features eller commits.
 - Verifiera alltid ändringar med `npx tsc --noEmit` och `npx next lint` innan push till `main`.

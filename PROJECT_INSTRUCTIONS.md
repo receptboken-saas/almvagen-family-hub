@@ -45,8 +45,8 @@
 
 ---
 
-## Verifiering före commit & push
-Kör alltid:
+## Verifiering & Dokumentation före commit & push
+Uppdatera `CHANGELOG.md` (och vid behov `BACKLOG.md`) samt kör alltid:
 ```bash
 npx tsc --noEmit
 npx next lint
