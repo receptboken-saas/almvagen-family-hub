@@ -85,15 +85,6 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
     setHistory((prev) => [...prev.slice(-19), watts]);
   }, [watts]);
 
-  if (!powerWidget) {
-    return null;
-  }
-
-  const clampedWatts = watts !== null ? Math.max(0, Math.min(watts, MAX_WATTS)) : 0;
-  const ratio = watts !== null ? clampedWatts / MAX_WATTS : 0;
-  const strokeDashoffset = ARC_SPAN * (1 - ratio);
-  const arcColor = watts !== null ? getLoadColor(watts) : "#334155";
-
   const sparklinePoints = useMemo(() => {
     if (history.length < 2) return "";
     const min = Math.min(...history);
@@ -107,6 +98,15 @@ export function EnergyGauge({ widgets, isAdmin }: EnergyGaugeProps) {
       })
       .join(" ");
   }, [history]);
+
+  if (!powerWidget) {
+    return null;
+  }
+
+  const clampedWatts = watts !== null ? Math.max(0, Math.min(watts, MAX_WATTS)) : 0;
+  const ratio = watts !== null ? clampedWatts / MAX_WATTS : 0;
+  const strokeDashoffset = ARC_SPAN * (1 - ratio);
+  const arcColor = watts !== null ? getLoadColor(watts) : "#334155";
 
   const priceUnit =
     priceWidget?.unit ?? priceEntity?.attributes.unit_of_measurement ?? "kr/kWh";

@@ -58,9 +58,6 @@ const WIDGET_CATEGORIES: WidgetCategory[] = [
   "security",
 ];
 
-const ROOM_ICONS = ["sofa", "utensils", "bed", "bath", "car", "trees", "lamp"];
-const WIDGET_ICONS = ["zap", "coins", "plug-zap", "flame", "thermometer", "shield", "sparkles"];
-
 export function AdminPanel({
   isOpen,
   onClose,
