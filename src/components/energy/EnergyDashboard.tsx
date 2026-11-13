@@ -218,13 +218,10 @@ export function EnergyDashboard({
     [period, config, floors, rooms, roomDevices, widgets, entities, statistics, tibberData],
   );
 
-  const hasGaugeWidget = useMemo(
-    () =>
-      widgets.some(
-        (w) => w.widget_category === "energy" && (isAdmin || !w.admin_only),
-      ),
-    [widgets, isAdmin],
-  );
+  const periodLabel =
+    PERIOD_OPTIONS.find((p) => p.id === period)?.label ?? "Idag";
+  const costPerHourKr =
+    (summary.liveTotalWatts / 1000) * summary.totalPricePerKwh;
 
   const sortedDevices = useMemo(() => {
     const copy = [...summary.devices];
@@ -318,193 +315,213 @@ export function EnergyDashboard({
         </div>
       )}
 
-      {/* Top Smart Cards */}
+      {/* NIVÅ 1 (ÖVERST): Innevarande period – Kostnad, Förbrukning & Realtidspuls */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        {hasGaugeWidget && (
-          <div className="lg:col-span-4">
-            <EnergyGauge widgets={widgets} isAdmin={isAdmin} />
-          </div>
-        )}
-
-        <div
-          className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
-            hasGaugeWidget ? "lg:col-span-8" : "lg:col-span-12 xl:grid-cols-4"
-          }`}
-        >
-          {/* Card 1: Total consumption, cost & fuse guard */}
-          <Card className="flex flex-col justify-between space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Förbrukning ({PERIOD_OPTIONS.find((p) => p.id === period)?.label})
-                </p>
-                <p className="tabular-nums mt-1 text-2xl font-bold text-[var(--text-primary)]">
-                  {formatKwh(summary.totalKwh)}
-                </p>
-                <p className="tabular-nums text-sm font-semibold text-[#6B8E6B]">
+        {/* Vänster/Huvudkort: Periodens Kostnad & Förbrukning */}
+        <Card className="flex flex-col justify-between space-y-5 p-6 lg:col-span-7">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                Kostnad &amp; Förbrukning – {periodLabel}
+              </p>
+              <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                <p className="tabular-nums text-3xl font-bold text-[#6B8E6B] sm:text-4xl">
                   {formatKr(summary.totalCostKr)}
                 </p>
+                <p className="tabular-nums text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
+                  {formatKwh(summary.totalKwh)}
+                </p>
               </div>
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6B8E6B]/15 text-[#6B8E6B]">
-                <Zap className="h-5 w-5" aria-hidden="true" />
-              </span>
             </div>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#6B8E6B]/15 text-[#6B8E6B]">
+              <Zap className="h-5 w-5" aria-hidden="true" />
+            </span>
+          </div>
 
-            <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[var(--text-secondary)]">
-                  Huvudsäkring ({config.mainFuseAmps} A)
-                </span>
-                <span className="tabular-nums font-semibold text-[var(--text-primary)]">
-                  {formatWatts(summary.liveTotalWatts)} /{" "}
-                  {(summary.fuseMaxWatts / 1000).toFixed(1)} kW
-                </span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
-                <div
-                  className={`h-full rounded-full transition-all ${fuseColor}`}
-                  style={{ width: `${summary.fuseLoadPct}%` }}
-                />
-              </div>
-              <p className="tabular-nums text-[11px] text-[var(--text-secondary)]">
-                Elpris just nu:{" "}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-[var(--bg-subtle)]/60 px-3.5 py-2.5 text-xs">
+            <span className="tabular-nums text-[var(--text-secondary)]">
+              Elpris just nu:{" "}
+              <strong className="text-[var(--text-primary)]">
                 {summary.spotPriceKr !== null
-                  ? `${summary.totalPricePerKwh.toFixed(2)} kr/kWh (inkl. ${config.gridFeePerKwh.toFixed(2)} kr nät)`
+                  ? `${summary.totalPricePerKwh.toFixed(2)} kr/kWh inkl. nät`
                   : `Nätavgift ${config.gridFeePerKwh.toFixed(2)} kr/kWh`}
-              </p>
-            </div>
-          </Card>
+              </strong>
+            </span>
+            <span className="tabular-nums text-[var(--text-secondary)]">
+              Just nu:{" "}
+              <strong className="text-[#C86D51]">
+                {costPerHourKr.toLocaleString("sv-SE", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                kr/tim
+              </strong>
+            </span>
+          </div>
 
-          {/* Card 2: Effekttoppar */}
-          <Card className="flex flex-col justify-between space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Effekttoppar
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                  {config.gridOperator
-                    ? `${config.gridOperator}${config.municipality ? ` (${config.municipality})` : ""}`
-                    : "Högsta timmarna (effekttariff-koll)"}
-                </p>
-                {config.gridTariffSummary && (
-                  <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
-                    {config.gridTariffSummary}
-                  </p>
-                )}
-              </div>
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C86D51]/15 text-[#C86D51]">
-                <Flame className="h-5 w-5" aria-hidden="true" />
+          <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--text-secondary)]">
+                Huvudsäkring ({config.mainFuseAmps} A)
+              </span>
+              <span className="tabular-nums font-semibold text-[var(--text-primary)]">
+                {formatWatts(summary.liveTotalWatts)} /{" "}
+                {(summary.fuseMaxWatts / 1000).toFixed(1)} kW (
+                {summary.fuseLoadPct}%)
               </span>
             </div>
-
-            {summary.topPeaks.length > 0 ? (
-              <div className="space-y-2">
-                {summary.topPeaks.map((peak, idx) => (
-                  <div
-                    key={peak.timestamp}
-                    className="flex items-center justify-between rounded-lg bg-[var(--bg-subtle)]/60 px-2.5 py-1.5 text-xs"
-                  >
-                    <span className="text-[var(--text-secondary)]">
-                      #{idx + 1} · {peak.label}
-                    </span>
-                    <span className="tabular-nums font-bold text-[#C86D51]">
-                      {peak.kw.toFixed(2)} kW
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--text-secondary)]">
-                Koppla huvudmätare (kWh/W) i Energiinställningar för att se
-                timtoppar.
-              </p>
-            )}
-          </Card>
-
-          {/* Card 3: Bästa starttid */}
-          <Card className="flex flex-col justify-between space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Bästa starttid
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                  Billigaste fönster för tvätt/tork/laddning
-                </p>
-              </div>
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D49A42]/15 text-[#D49A42]">
-                <Clock className="h-5 w-5" aria-hidden="true" />
-              </span>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+              <div
+                className={`h-full rounded-full transition-all ${fuseColor}`}
+                style={{ width: `${summary.fuseLoadPct}%` }}
+              />
             </div>
+          </div>
+        </Card>
 
-            {summary.cheapestWindows.length > 0 ? (
-              <div className="space-y-2">
-                {summary.cheapestWindows.map((win) => (
-                  <div
-                    key={win.durationHours}
-                    className="flex items-center justify-between rounded-lg bg-[var(--bg-subtle)]/60 px-2.5 py-1.5 text-xs"
-                  >
-                    <span className="text-[var(--text-primary)]">
-                      <strong>{win.durationHours}h:</strong>{" "}
-                      {win.isTomorrow ? "Imorgon " : "Idag "}
-                      {win.startHour}–{win.endHour}
-                    </span>
-                    <span className="tabular-nums font-bold text-[#6B8E6B]">
-                      {win.avgPriceKr.toFixed(2)} kr/kWh
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--text-secondary)]">
-                Timpris-prognos visas automatiskt om din elprissensor innehåller
-                timpriser (`raw_today` / `today`).
-              </p>
-            )}
-          </Card>
-
-          {/* Card 4: Nattlig baslast */}
-          <Card className="flex flex-col justify-between space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Nattlig baslast
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                  Lägsta förbrukning 00:00–05:00
-                </p>
-              </div>
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
-                <Moon className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-
-            {summary.baseloadWatts !== null ? (
-              <div className="space-y-1">
-                <p className="tabular-nums text-2xl font-bold text-[var(--text-primary)]">
-                  {formatWatts(summary.baseloadWatts)}
-                </p>
-                <p className="tabular-nums text-xs text-[var(--text-secondary)]">
-                  Motsvarar ca{" "}
-                  <strong>
-                    {formatKr(
-                      (summary.baseloadWatts / 1000) *
-                        24 *
-                        30 *
-                        summary.totalPricePerKwh,
-                    )}
-                  </strong>{" "}
-                  / mån i konstant grundlast
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--text-secondary)]">
-                Väntar på nattstatistik från huvudmätaren.
-              </p>
-            )}
-          </Card>
+        {/* Högerkort: Cirkelmätare / Realtidspuls */}
+        <div className="lg:col-span-5">
+          <EnergyGauge
+            liveWatts={summary.liveTotalWatts}
+            totalPricePerKwh={summary.totalPricePerKwh}
+            hasPrice={summary.spotPriceKr !== null}
+            fuseMaxWatts={summary.fuseMaxWatts}
+            isConnected={isConnected}
+          />
         </div>
+      </div>
+
+      {/* NIVÅ 2 (MELLAN): Insikter & Besparing */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* Card 1: Effekttoppar */}
+        <Card className="flex flex-col justify-between space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                Effekttoppar
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                {config.gridOperator
+                  ? `${config.gridOperator}${config.municipality ? ` (${config.municipality})` : ""}`
+                  : "Högsta timmarna (effekttariff-koll)"}
+              </p>
+              {config.gridTariffSummary && (
+                <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                  {config.gridTariffSummary}
+                </p>
+              )}
+            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C86D51]/15 text-[#C86D51]">
+              <Flame className="h-5 w-5" aria-hidden="true" />
+            </span>
+          </div>
+
+          {summary.topPeaks.length > 0 ? (
+            <div className="space-y-2">
+              {summary.topPeaks.map((peak, idx) => (
+                <div
+                  key={peak.timestamp}
+                  className="flex items-center justify-between rounded-lg bg-[var(--bg-subtle)]/60 px-2.5 py-1.5 text-xs"
+                >
+                  <span className="text-[var(--text-secondary)]">
+                    #{idx + 1} · {peak.label}
+                  </span>
+                  <span className="tabular-nums font-bold text-[#C86D51]">
+                    {peak.kw.toFixed(2)} kW
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--text-secondary)]">
+              Koppla huvudmätare (kWh/W) i Energiinställningar för att se
+              timtoppar.
+            </p>
+          )}
+        </Card>
+
+        {/* Card 2: Bästa starttid */}
+        <Card className="flex flex-col justify-between space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                Bästa starttid
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                Billigaste fönster för tvätt/tork/laddning
+              </p>
+            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D49A42]/15 text-[#D49A42]">
+              <Clock className="h-5 w-5" aria-hidden="true" />
+            </span>
+          </div>
+
+          {summary.cheapestWindows.length > 0 ? (
+            <div className="space-y-2">
+              {summary.cheapestWindows.map((win) => (
+                <div
+                  key={win.durationHours}
+                  className="flex items-center justify-between rounded-lg bg-[var(--bg-subtle)]/60 px-2.5 py-1.5 text-xs"
+                >
+                  <span className="text-[var(--text-primary)]">
+                    <strong>{win.durationHours}h:</strong>{" "}
+                    {win.isTomorrow ? "Imorgon " : "Idag "}
+                    {win.startHour}–{win.endHour}
+                  </span>
+                  <span className="tabular-nums font-bold text-[#6B8E6B]">
+                    {win.avgPriceKr.toFixed(2)} kr/kWh
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--text-secondary)]">
+              Timpris-prognos visas automatiskt om din elprissensor innehåller
+              timpriser (`raw_today` / `today`).
+            </p>
+          )}
+        </Card>
+
+        {/* Card 3: Nattlig baslast */}
+        <Card className="flex flex-col justify-between space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                Nattlig baslast
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                Lägsta förbrukning 00:00–05:00
+              </p>
+            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
+              <Moon className="h-5 w-5" aria-hidden="true" />
+            </span>
+          </div>
+
+          {summary.baseloadWatts !== null ? (
+            <div className="space-y-1">
+              <p className="tabular-nums text-2xl font-bold text-[var(--text-primary)]">
+                {formatWatts(summary.baseloadWatts)}
+              </p>
+              <p className="tabular-nums text-xs text-[var(--text-secondary)]">
+                Motsvarar ca{" "}
+                <strong>
+                  {formatKr(
+                    (summary.baseloadWatts / 1000) *
+                      24 *
+                      30 *
+                      summary.totalPricePerKwh,
+                  )}
+                </strong>{" "}
+                / mån i konstant grundlast
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--text-secondary)]">
+              Väntar på nattstatistik från huvudmätaren.
+            </p>
+          )}
+        </Card>
       </div>
 
       {/* Breakdown Section: Groups / Rooms & Floors / All Devices */}

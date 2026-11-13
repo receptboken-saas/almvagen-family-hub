@@ -493,9 +493,29 @@ export function computeEnergyDashboard(params: {
     ? computeTibberPeriodTotals(tibberData, period)
     : null;
 
+  const gridFee = config.gridFeePerKwh ?? 0;
+  const tibberPeriodKwh = tibberData
+    ? period === "today" || period === "now"
+      ? tibberData.todayKwh
+      : period === "7d"
+        ? tibberData.last7dKwh
+        : (tibberTotals?.kwh ?? 0)
+    : 0;
+  const tibberPeriodBaseCost = tibberData
+    ? period === "today" || period === "now"
+      ? tibberData.todayCostKr
+      : period === "7d"
+        ? tibberData.last7dCostKr
+        : (tibberTotals?.costKr ?? 0)
+    : 0;
+  const tibberPeriodCostWithGrid =
+    tibberPeriodBaseCost > 0
+      ? tibberPeriodBaseCost + tibberPeriodKwh * gridFee
+      : 0;
+
   const effectiveTotalKwh =
-    tibberTotals && tibberTotals.kwh > 0
-      ? tibberTotals.kwh
+    tibberPeriodKwh > 0
+      ? tibberPeriodKwh
       : totalKwh > 0
         ? totalKwh
         : measuredKwh;
@@ -506,13 +526,13 @@ export function computeEnergyDashboard(params: {
     mainEnergyStats,
     priceStats,
     effectivePricePerKwh,
-    config.gridFeePerKwh ?? 0,
+    gridFee,
     mainEnergyUnit,
     priceUnit,
   );
   const totalCostKr =
-    tibberTotals && tibberTotals.costKr > 0
-      ? tibberTotals.costKr
+    tibberPeriodCostWithGrid > 0
+      ? tibberPeriodCostWithGrid
       : weightedTotalCost !== null
         ? weightedTotalCost
         : effectiveTotalKwh * effectivePricePerKwh;

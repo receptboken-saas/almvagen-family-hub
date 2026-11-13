@@ -27,6 +27,10 @@ export interface TibberSyncData {
   tomorrowPrices: TibberPriceNode[];
   dailyNodes: TibberDailyNode[];
   hourlyNodes: TibberHourlyNode[];
+  todayKwh: number;
+  todayCostKr: number;
+  last7dKwh: number;
+  last7dCostKr: number;
 }
 
 const TIBBER_GQL_URL = "https://api.tibber.com/v1-beta/gql";
@@ -63,7 +67,7 @@ query AlmvagenTibberSync {
           cost
         }
       }
-      hourly: consumption(resolution: HOURLY, last: 168) {
+      hourly: consumption(resolution: HOURLY, last: 744) {
         nodes {
           from
           to
@@ -125,14 +129,50 @@ export async function fetchTibberData(
   if (!home) return null;
 
   const priceInfo = home.currentSubscription?.priceInfo;
+  const dailyNodes = home.daily?.nodes ?? [];
+  const hourlyNodes = home.hourly?.nodes ?? [];
+
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+    0,
+  ).getTime();
+  const cutoff7d = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+
+  let todayKwh = 0;
+  let todayCostKr = 0;
+  let last7dKwh = 0;
+  let last7dCostKr = 0;
+
+  for (const n of hourlyNodes) {
+    const ts = Date.parse(n.from);
+    if (Number.isNaN(ts)) continue;
+    if (ts >= startOfToday) {
+      if (typeof n.consumption === "number") todayKwh += n.consumption;
+      if (typeof n.cost === "number") todayCostKr += n.cost;
+    }
+    if (ts >= cutoff7d) {
+      if (typeof n.consumption === "number") last7dKwh += n.consumption;
+      if (typeof n.cost === "number") last7dCostKr += n.cost;
+    }
+  }
 
   return {
     homeName: home.appNickname || home.address?.address1 || "Tibber Hem",
     currentPriceKr: priceInfo?.current?.total ?? null,
     todayPrices: priceInfo?.today ?? [],
     tomorrowPrices: priceInfo?.tomorrow ?? [],
-    dailyNodes: home.daily?.nodes ?? [],
-    hourlyNodes: home.hourly?.nodes ?? [],
+    dailyNodes,
+    hourlyNodes,
+    todayKwh,
+    todayCostKr,
+    last7dKwh,
+    last7dCostKr,
   };
 }
 
