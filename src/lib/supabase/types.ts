@@ -74,6 +74,8 @@ export interface DinnerPlan {
   updated_at: string;
 }
 
+export type NoteColor = "ochre" | "sage" | "terracotta" | "linen";
+
 export interface FamilyNote {
   id: string;
   property_id: string;
@@ -82,6 +84,9 @@ export interface FamilyNote {
   content: string;
   is_pinned: boolean;
   is_done: boolean;
+  note_color: NoteColor | null;
+  target_profile_id: string | null;
+  target_name: string | null;
   created_at: string;
 }
 

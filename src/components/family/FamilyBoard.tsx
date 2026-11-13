@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Check, ChevronDown, Pin, Plus, Sparkles, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Check, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { isSystemFamilyNote } from "@/lib/supabase/familyMeta";
-import type { FamilyNote, Profile } from "@/lib/supabase/types";
-import { Card } from "@/components/ui/Card";
+import { useAuth } from "@/lib/supabase/useAuth";
+import type { FamilyNote, NoteColor, Profile } from "@/lib/supabase/types";
 import { AvatarBadge } from "@/components/ui/AvatarBadge";
 
 interface FamilyBoardProps {
@@ -17,10 +17,52 @@ interface FamilyBoardProps {
   onDataChanged?: () => Promise<void> | void;
 }
 
-const NOTE_ACCENTS = [
-  "border-l-4 border-l-[#6B8E6B]",
-  "border-l-4 border-l-[#D49A42]",
-  "border-l-4 border-l-[#C86D51]",
+type RosterProfile = Pick<
+  Profile,
+  "id" | "avatar_url" | "avatar_icon" | "display_name" | "role"
+>;
+
+const NOTE_COLORS: NoteColor[] = ["ochre", "sage", "terracotta", "linen"];
+
+const NOTE_COLOR_STYLES: Record<
+  NoteColor,
+  { label: string; dot: string; card: string; badge: string; pin: string }
+> = {
+  ochre: {
+    label: "Honungsgul",
+    dot: "bg-[#F2D07D] border-[#D49A42]",
+    card: "bg-[#FDF3D7] border-[#E7C97A] dark:bg-[#3A301D] dark:border-[#6A552A]",
+    badge: "bg-[#D49A42]/18 text-[#8C6118] dark:text-[#F2CF88]",
+    pin: "bg-[#D49A42]",
+  },
+  sage: {
+    label: "Salviagrön",
+    dot: "bg-[#A5C4A5] border-[#6B8E6B]",
+    card: "bg-[#EBF3E8] border-[#B8D1B5] dark:bg-[#233124] dark:border-[#415C43]",
+    badge: "bg-[#6B8E6B]/18 text-[#3F613F] dark:text-[#A9CCA9]",
+    pin: "bg-[#6B8E6B]",
+  },
+  terracotta: {
+    label: "Terrakotta",
+    dot: "bg-[#E6A38E] border-[#C86D51]",
+    card: "bg-[#FCEBE4] border-[#E4B8A7] dark:bg-[#3A241E] dark:border-[#6D4136]",
+    badge: "bg-[#C86D51]/18 text-[#96452C] dark:text-[#F0AA93]",
+    pin: "bg-[#C86D51]",
+  },
+  linen: {
+    label: "Linnevit",
+    dot: "bg-[#FAF6EF] border-[#C9BFAF]",
+    card: "bg-[#FAF7F0] border-[#DFD6C7] dark:bg-[#2B2520] dark:border-[#493F37]",
+    badge: "bg-[var(--bg-subtle)] text-[var(--text-secondary)]",
+    pin: "bg-[#8E8276]",
+  },
+};
+
+const NOTE_TILTS = [
+  "rotate-[-0.8deg]",
+  "rotate-[0.6deg]",
+  "rotate-[-0.5deg]",
+  "rotate-[0.7deg]",
 ];
 
 function formatShortDate(iso: string): string {
@@ -28,8 +70,6 @@ function formatShortDate(iso: string): string {
     return new Date(iso).toLocaleDateString("sv-SE", {
       day: "numeric",
       month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   } catch {
     return "";
@@ -44,15 +84,16 @@ export function FamilyBoard({
   singleColumnCards = false,
   onDataChanged,
 }: FamilyBoardProps) {
+  const { profile: activeProfile } = useAuth();
+  const isChildView = activeProfile?.role === "child";
+
   const [notes, setNotes] = useState<FamilyNote[]>([]);
-  const [avatarsByAuthor, setAvatarsByAuthor] = useState<
-    Record<string, Pick<Profile, "avatar_url" | "avatar_icon" | "display_name">>
-  >({});
+  const [roster, setRoster] = useState<RosterProfile[]>([]);
   const [content, setContent] = useState("");
+  const [noteColor, setNoteColor] = useState<NoteColor>("ochre");
+  const [targetProfileId, setTargetProfileId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [useGemini, setUseGemini] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(isChildView);
   const [mobileShowForm, setMobileShowForm] = useState(false);
 
   const loadNotes = useCallback(async () => {
@@ -66,14 +107,15 @@ export function FamilyBoard({
       supabase
         .from("family_notes")
         .select(
-          "id, property_id, author_id, author_name, content, is_pinned, is_done, created_at",
+          "id, property_id, author_id, author_name, content, is_pinned, is_done, note_color, target_profile_id, target_name, created_at",
         )
         .eq("property_id", propertyId)
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false }),
       supabase
         .from("profiles")
-        .select("id, avatar_url, avatar_icon, display_name"),
+        .select("id, avatar_url, avatar_icon, display_name, role")
+        .order("display_name", { ascending: true }),
     ]);
 
     if (!notesRes.error && notesRes.data) {
@@ -83,17 +125,7 @@ export function FamilyBoard({
       setNotes(humanNotes);
     }
     if (!profRes.error && profRes.data) {
-      const map: Record<
-        string,
-        Pick<Profile, "avatar_url" | "avatar_icon" | "display_name">
-      > = {};
-      for (const p of profRes.data as Pick<
-        Profile,
-        "id" | "avatar_url" | "avatar_icon" | "display_name"
-      >[]) {
-        map[p.id] = p;
-      }
-      setAvatarsByAuthor(map);
+      setRoster(profRes.data as RosterProfile[]);
     }
   }, [propertyId]);
 
@@ -101,28 +133,37 @@ export function FamilyBoard({
     loadNotes();
   }, [loadNotes]);
 
-  if (!propertyId) return null;
+  useEffect(() => {
+    if (isChildView) {
+      setMobileExpanded(true);
+    }
+  }, [isChildView]);
 
-  async function insertPlainNote(text: string) {
-    const supabase = getSupabaseClient();
-    if (!supabase || !propertyId) return false;
-    const { error } = await supabase.from("family_notes").insert({
-      property_id: propertyId,
-      author_id: userId,
-      author_name: authorName,
-      content: text,
-      is_pinned: false,
-      is_done: false,
+  const avatarsByAuthor = useMemo(() => {
+    const map: Record<string, RosterProfile> = {};
+    for (const p of roster) {
+      map[p.id] = p;
+    }
+    return map;
+  }, [roster]);
+
+  const recipientProfiles = useMemo(
+    () => roster.filter((p) => p.role !== "tablet" && Boolean(p.display_name)),
+    [roster],
+  );
+
+  const sortedNotes = useMemo(() => {
+    if (!isChildView || !activeProfile?.id) return notes;
+    return [...notes].sort((a, b) => {
+      const aForChild =
+        a.target_profile_id === activeProfile.id || !a.target_profile_id ? 1 : 0;
+      const bForChild =
+        b.target_profile_id === activeProfile.id || !b.target_profile_id ? 1 : 0;
+      return bForChild - aForChild;
     });
-    return !error;
-  }
+  }, [notes, isChildView, activeProfile?.id]);
 
-  function showToast(msg: string) {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 5000);
-  }
+  if (!propertyId) return null;
 
   async function handleAddNote(e: FormEvent) {
     e.preventDefault();
@@ -131,46 +172,27 @@ export function FamilyBoard({
     if (!supabase || !propertyId || !text || busy) return;
 
     setBusy(true);
-    setToastMessage(null);
+    const targetProfile = targetProfileId
+      ? recipientProfiles.find((p) => p.id === targetProfileId) ?? null
+      : null;
 
-    if (useGemini) {
-      try {
-        const { data: fnData, error } = await supabase.functions.invoke(
-          "gemini-hub-assistant",
-          {
-            body: {
-              action: "parse_family_input",
-              property_id: propertyId,
-              payload: {
-                text,
-                author_id: userId,
-                author_name: authorName,
-              },
-            },
-          },
-        );
+    const { error } = await supabase.from("family_notes").insert({
+      property_id: propertyId,
+      author_id: userId,
+      author_name: authorName,
+      content: text,
+      is_pinned: false,
+      is_done: false,
+      note_color: noteColor,
+      target_profile_id: targetProfile ? targetProfile.id : null,
+      target_name: targetProfile ? targetProfile.display_name : null,
+    });
 
-        if (!error && fnData) {
-          const res = fnData as { message?: string; summary?: string };
-          setContent("");
-          await loadNotes();
-          if (onDataChanged) await onDataChanged();
-          showToast(
-            res.message || res.summary || "Tolkad och sparad med Gemini",
-          );
-          setBusy(false);
-          return;
-        }
-      } catch {
-        // Fall back to direct note insert below
-      }
-    }
-
-    const ok = await insertPlainNote(text);
-    if (ok) {
+    if (!error) {
       setContent("");
+      setTargetProfileId(null);
       await loadNotes();
-      showToast("Sparade lapp på anslagstavlan");
+      if (onDataChanged) await onDataChanged();
     }
     setBusy(false);
   }
@@ -187,16 +209,6 @@ export function FamilyBoard({
       .eq("id", note.id);
   }
 
-  async function togglePin(note: FamilyNote) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-    await supabase
-      .from("family_notes")
-      .update({ is_pinned: !note.is_pinned })
-      .eq("id", note.id);
-    await loadNotes();
-  }
-
   async function deleteNote(noteId: string) {
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -207,7 +219,10 @@ export function FamilyBoard({
   const activeCount = notes.filter((n) => !n.is_done).length;
 
   return (
-    <section aria-labelledby="family-board-heading" className="space-y-3 sm:space-y-4">
+    <section
+      aria-labelledby="family-board-heading"
+      className="space-y-3 sm:space-y-4"
+    >
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
@@ -249,8 +264,10 @@ export function FamilyBoard({
         </span>
       </div>
 
-      <Card
-        className={`space-y-4 ${
+      {/* Warm cork/linen framed board */}
+      <div
+        style={{ boxShadow: "var(--card-shadow)" }}
+        className={`space-y-4 rounded-3xl border-2 border-[#D8CEBE] bg-[#F1EAE0]/80 p-4 sm:p-5 dark:border-[#3E352D] dark:bg-[#211C18]/90 ${
           mobileExpanded ? "block" : "hidden sm:block"
         }`}
       >
@@ -258,97 +275,155 @@ export function FamilyBoard({
           onSubmit={handleAddNote}
           className={`${
             mobileShowForm ? "flex" : "hidden sm:flex"
-          } flex-col gap-2.5`}
+          } flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]/90 p-3.5`}
         >
-          <div className="flex flex-col gap-2.5 sm:flex-row">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               type="text"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Skriv en lapp, middag eller händelse (t.ex. Tacos imorgon, Träning kl 17)…"
-              className="min-h-11 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none sm:min-h-12"
+              placeholder="Skriv en kom-ihåg-lapp..."
+              className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/65 focus:border-[#6B8E6B] focus:outline-none"
             />
             <button
               type="submit"
               disabled={busy || !content.trim()}
-              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#6B8E6B] px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-12"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#6B8E6B] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Plus className="h-4 w-4" />
-              <span>{busy ? "Sparar…" : "Lägg till"}</span>
+              <span>{busy ? "Sätter upp…" : "Sätt upp"}</span>
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={useGemini}
-                onChange={(e) => setUseGemini(e.target.checked)}
-                className="h-3.5 w-3.5 accent-[#6B8E6B]"
-              />
-              <Sparkles className="h-3.5 w-3.5 text-[#D49A42]" aria-hidden="true" />
-              <span>Tolka med Gemini</span>
-            </label>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Color picker dots */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+                Färg:
+              </span>
+              <div className="flex items-center gap-1.5">
+                {NOTE_COLORS.map((colorKey) => {
+                  const cfg = NOTE_COLOR_STYLES[colorKey];
+                  const selected = noteColor === colorKey;
+                  return (
+                    <button
+                      key={colorKey}
+                      type="button"
+                      onClick={() => setNoteColor(colorKey)}
+                      aria-label={cfg.label}
+                      aria-pressed={selected}
+                      title={cfg.label}
+                      className={`h-6 w-6 rounded-full border-2 transition-transform ${cfg.dot} ${
+                        selected
+                          ? "scale-110 ring-2 ring-[#292421]/40 ring-offset-1 dark:ring-[#F4EFEA]/50"
+                          : "opacity-80 hover:scale-105 hover:opacity-100"
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Recipient pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+                Till:
+              </span>
+              <button
+                type="button"
+                onClick={() => setTargetProfileId(null)}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  targetProfileId === null
+                    ? "border-[#6B8E6B] bg-[#6B8E6B] text-white"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Alla
+              </button>
+              {recipientProfiles.map((person) => {
+                const selected = targetProfileId === person.id;
+                return (
+                  <button
+                    key={person.id}
+                    type="button"
+                    onClick={() => setTargetProfileId(person.id)}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      selected
+                        ? "border-[#6B8E6B] bg-[#6B8E6B] text-white"
+                        : "border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {person.display_name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </form>
 
-        {toastMessage && (
-          <div
-            role="status"
-            className="flex items-center gap-2 rounded-xl border border-[#6B8E6B]/30 bg-[#6B8E6B]/12 px-3.5 py-2 text-xs font-medium text-[#6B8E6B]"
-          >
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#D49A42]" aria-hidden="true" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        {notes.length === 0 ? (
-          <p className="py-3 text-center text-xs text-[var(--text-secondary)]">
-            Anslagstavlan är tom – skriv en kom-ihåg ovan!
+        {sortedNotes.length === 0 ? (
+          <p className="py-5 text-center text-xs text-[var(--text-secondary)]">
+            Anslagstavlan är tom – sätt upp en Post-it-lapp ovan!
           </p>
         ) : (
           <div
-            className={`grid grid-cols-1 gap-3 ${
-              singleColumnCards ? "" : "sm:grid-cols-2 lg:grid-cols-3"
+            className={`grid grid-cols-2 gap-3.5 ${
+              singleColumnCards ? "" : "lg:grid-cols-3"
             }`}
           >
-            {notes.map((note, idx) => {
+            {sortedNotes.map((note, idx) => {
+              const colorKey: NoteColor =
+                note.note_color && note.note_color in NOTE_COLOR_STYLES
+                  ? note.note_color
+                  : "ochre";
+              const palette = NOTE_COLOR_STYLES[colorKey];
+              const tiltClass = NOTE_TILTS[idx % NOTE_TILTS.length];
               const canDelete = isAdmin || note.author_id === userId;
-              const accentClass = note.is_pinned
-                ? "border-l-4 border-l-[#C86D51] bg-[#C86D51]/5"
-                : NOTE_ACCENTS[idx % NOTE_ACCENTS.length];
+              const isTargetedToActive =
+                Boolean(activeProfile?.id) &&
+                (note.target_profile_id === activeProfile?.id ||
+                  !note.target_profile_id);
+              const highlightForChild = isChildView && isTargetedToActive;
 
               return (
-                <div
+                <article
                   key={note.id}
-                  className={`flex flex-col justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/45 p-3.5 transition-all ${accentClass} ${
-                    note.is_done ? "opacity-60" : ""
+                  className={`relative flex min-h-36 flex-col justify-between gap-3 rounded-xl border p-3.5 pt-5 shadow-sm transition-all hover:rotate-0 hover:shadow-md ${palette.card} ${tiltClass} ${
+                    note.is_done ? "opacity-55" : ""
+                  } ${
+                    highlightForChild
+                      ? "ring-2 ring-[#6B8E6B]/60 ring-offset-1 ring-offset-transparent"
+                      : ""
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleDone(note)}
-                      aria-label={note.is_done ? "Markera som oklar" : "Markera som klar"}
-                      className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                        note.is_done
-                          ? "border-[#6B8E6B] bg-[#6B8E6B] text-white"
-                          : "border-[var(--border-subtle)] bg-[var(--bg-card)] text-transparent hover:border-[#6B8E6B]"
-                      }`}
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
+                  {/* Subtle pushpin detail at top center */}
+                  <span
+                    aria-hidden="true"
+                    className={`absolute left-1/2 top-2 h-2.5 w-2.5 -translate-x-1/2 rounded-full shadow-sm ring-2 ring-white/70 dark:ring-black/30 ${palette.pin}`}
+                  />
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span
+                        className={`inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold ${palette.badge}`}
+                      >
+                        {note.target_name ? `Till: ${note.target_name}` : "Till: Alla"}
+                      </span>
+                    </div>
+
                     <p
                       className={`text-sm leading-snug text-[var(--text-primary)] ${
-                        note.is_done ? "line-through text-[var(--text-secondary)]" : ""
+                        note.is_done
+                          ? "line-through text-[var(--text-secondary)]"
+                          : ""
                       }`}
                     >
                       {note.content}
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)]/70 pt-2 text-[11px] text-[var(--text-secondary)]">
-                    <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex items-center justify-between gap-1.5 border-t border-black/10 pt-2 text-[11px] text-[var(--text-secondary)] dark:border-white/10">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       <AvatarBadge
                         avatarUrl={
                           note.author_id
@@ -361,47 +436,55 @@ export function FamilyBoard({
                             : null
                         }
                         displayName={note.author_name}
-                        sizeClass="h-6 w-6 rounded-lg text-[10px]"
+                        sizeClass="h-5 w-5 rounded-md text-[9px]"
                       />
-                      <span className="truncate">
-                        <strong className="font-semibold text-[var(--text-primary)]">
-                          {note.author_name}
-                        </strong>{" "}
+                      <span className="truncate font-medium text-[var(--text-primary)]">
+                        {note.author_name}
+                      </span>
+                      <span className="hidden shrink-0 text-[10px] sm:inline">
                         · {formatShortDate(note.created_at)}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => togglePin(note)}
-                        title={note.is_pinned ? "Lossa lapp" : "Nåla fast"}
-                        className={`rounded-lg p-1.5 transition-colors ${
-                          note.is_pinned
-                            ? "bg-[#C86D51]/15 text-[#C86D51]"
-                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        onClick={() => toggleDone(note)}
+                        aria-label={
+                          note.is_done
+                            ? "Markera som oklar"
+                            : "Markera som klar"
+                        }
+                        title={note.is_done ? "Oklar" : "Klar"}
+                        className={`inline-flex h-6 items-center gap-0.5 rounded-md border px-1.5 text-[10px] font-semibold transition-colors ${
+                          note.is_done
+                            ? "border-[#6B8E6B] bg-[#6B8E6B] text-white"
+                            : "border-black/15 bg-white/60 text-[var(--text-primary)] hover:border-[#6B8E6B] hover:bg-[#6B8E6B]/15 dark:border-white/15 dark:bg-black/20"
                         }`}
                       >
-                        <Pin className="h-3.5 w-3.5" />
+                        <Check className="h-3 w-3" />
+                        <span className="hidden sm:inline">Klar</span>
                       </button>
+
                       {canDelete && (
                         <button
                           type="button"
                           onClick={() => deleteNote(note.id)}
+                          aria-label="Ta bort lapp"
                           title="Ta bort lapp"
-                          className="rounded-lg p-1.5 text-[#C86D51] hover:bg-[#C86D51]/15"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[#C86D51] hover:bg-[#C86D51]/15"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
         )}
-      </Card>
+      </div>
     </section>
   );
 }

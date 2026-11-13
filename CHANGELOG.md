@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.14.0] – 2026-11-13 (Taktil Post-it-anslagstavla med färgval & namnmärkning)
+- **Databas & Typer (`types.ts`):** Lade till `NoteColor` (`'ochre' | 'sage' | 'terracotta' | 'linen'`), `note_color`, `target_profile_id` och `target_name` på `FamilyNote`.
+- **Snabb Post-it-skapning (`FamilyBoard.tsx`):** Tog bort Gemini-kryssrutan för blixtsnabb inmatning med textfält (*"Skriv en kom-ihåg-lapp..."*), 4 färgprickar (*Honungsgul*, *Salviagrön*, *Terrakotta*, *Linnevit*), dynamiska mottagar-piller (`Alla` + familjeprofiler där `role !== 'tablet'`) och knappen **"+ Sätt upp"**.
+- **Taktil anslagstavla (`FamilyBoard.tsx`):** Varm kork-/linneinramning, responsivt rutnät (2 kolumner på mobil/Fold, 2–3 kolumner på tablet/desktop), pappersbakgrund i vald färg för både Ljust Linne och Mörk Valnöt, häftstiftsdetalj, diskret papperslutning, `Till: <Namn>`/`Till: Alla`-badge, avsändarens avatar + `✓ Klar` / ta bort-knappar samt tydlig markering av lappar riktade till barnet i barnvyn.
+
 ## [0.13.0] – 2026-11-13 ("Fråga Almvägen" & Verifierad Gemini-hjärna)
 - **Ny `"Fråga Almvägen"`-komponent (`AskHouseCard.tsx`):** Kompakt AI-kort i jordnära linne-/valnötstema med inmatningsfält, tre snabbfråge-piller (*"Vilka lampor lyser?"*, *"Hur ser veckan ut?"*, *"Vad blir det till middag?"*) och tydlig svarsruta. Döljs helt för `child`-profiler, visas fullt ut i *Familjen & Veckan* och som fällbar fråge-pill under *Hem & Styrning* på mobil/tablet (`< 1024px`).
 - **Realtidskontext (`house_context`):** Sammanställer automatiskt rums- och enhetsstatus från Home Assistant (`useHomeAssistant`), dashboard-widgets, `weekly_events` och `dinner_plans` utan hårdkodade `entity_id` och anropar `gemini-hub-assistant` (`action: 'ask_house'`).
