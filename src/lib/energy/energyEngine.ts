@@ -146,12 +146,21 @@ function parsePriceKr(entity: HassEntity | undefined): number | null {
 }
 
 function getPeriodHours(period: EnergyPeriod): number {
+  const now = new Date();
   if (period === "now" || period === "today") {
-    const now = new Date();
     return Math.max(0.25, now.getHours() + now.getMinutes() / 60);
   }
   if (period === "7d") return 7 * 24;
-  return 30 * 24;
+  const startOfMonth = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  ).getTime();
+  return Math.max(1, (now.getTime() - startOfMonth) / (1000 * 60 * 60));
 }
 
 function isEntityActive(entity: HassEntity | undefined): boolean {
@@ -539,6 +548,62 @@ export function computeEnergyDashboard(params: {
   const effectiveAvgPricePerKwh =
     effectiveTotalKwh > 0 ? totalCostKr / effectiveTotalKwh : effectivePricePerKwh;
 
+  const haTopPeaks = extractTopPeaks(
+    mainEnergyStats,
+    mainPowerStats,
+    mainPowerEntity?.attributes.unit_of_measurement,
+    3,
+  );
+  const topPeaks =
+    haTopPeaks.length > 0
+      ? haTopPeaks
+      : tibberData
+        ? extractTibberPeaks(tibberData, 3)
+        : [];
+
+  const haBaseload = estimateBaseloadWatts(
+    mainEnergyStats,
+    mainPowerStats,
+    mainPowerEntity?.attributes.unit_of_measurement,
+  );
+  const baseloadWatts =
+    haBaseload !== null
+      ? haBaseload
+      : tibberData
+        ? estimateTibberBaseloadWatts(tibberData)
+        : null;
+
+  // Allocate unmeasured remainder between Heating (when heating devices exist without W/kWh meters) and Other/Baseload
+  const heatingDevices = deviceReadings.filter((d) => d.category === "heating");
+  const heatingHasMeasuredData = heatingDevices.some(
+    (d) => d.liveWatts > 0 || d.kwh > 0,
+  );
+
+  let allocatedHeatingLiveWatts = 0;
+  let allocatedHeatingKwh = 0;
+
+  if (heatingDevices.length > 0 && !heatingHasMeasuredData) {
+    if (baseloadWatts !== null) {
+      const baseloadLive = Math.min(unmeasuredLiveWatts, baseloadWatts);
+      allocatedHeatingLiveWatts = Math.max(0, unmeasuredLiveWatts - baseloadLive);
+
+      const baseloadPeriodKwh = Math.min(
+        unmeasuredKwh * 0.65,
+        (baseloadWatts / 1000) * periodHours,
+      );
+      allocatedHeatingKwh = Math.max(0, unmeasuredKwh - baseloadPeriodKwh);
+    } else {
+      allocatedHeatingLiveWatts = Math.round(unmeasuredLiveWatts * 0.7);
+      allocatedHeatingKwh = unmeasuredKwh * 0.7;
+    }
+  }
+
+  const remainingOtherLiveWatts = Math.max(
+    0,
+    unmeasuredLiveWatts - allocatedHeatingLiveWatts,
+  );
+  const remainingOtherKwh = Math.max(0, unmeasuredKwh - allocatedHeatingKwh);
+
   // Build category breakdown (including per-floor sub-breakdown!)
   const categories: CategoryEnergyBreakdown[] = ENERGY_CATEGORIES_ORDER.map(
     (cat) => {
@@ -548,9 +613,12 @@ export function computeEnergyDashboard(params: {
       let liveWatts = catDevices.reduce((s, d) => s + d.liveWatts, 0);
       let kwh = catDevices.reduce((s, d) => s + d.kwh, 0);
 
-      if (cat === "other") {
-        liveWatts += unmeasuredLiveWatts;
-        kwh += unmeasuredKwh;
+      if (cat === "heating") {
+        liveWatts += allocatedHeatingLiveWatts;
+        kwh += allocatedHeatingKwh;
+      } else if (cat === "other") {
+        liveWatts += remainingOtherLiveWatts;
+        kwh += remainingOtherKwh;
       }
 
       const costKr = kwh * effectiveAvgPricePerKwh;
@@ -580,6 +648,13 @@ export function computeEnergyDashboard(params: {
         floorSubMap.set(fKey, prev);
       }
 
+      const configuredDeviceCount =
+        cat === "other"
+          ? catDevices.filter(
+              (d) => d.source !== "none" || d.liveWatts > 0 || d.kwh > 0,
+            ).length
+          : catDevices.length;
+
       return {
         category: cat,
         label: meta.label,
@@ -589,7 +664,7 @@ export function computeEnergyDashboard(params: {
         kwh,
         costKr,
         sharePct,
-        deviceCount: catDevices.length,
+        deviceCount: configuredDeviceCount,
         floorBreakdown: Array.from(floorSubMap.values()).sort(
           (a, b) => b.kwh - a.kwh || b.liveWatts - a.liveWatts,
         ),
@@ -625,31 +700,6 @@ export function computeEnergyDashboard(params: {
       rooms: roomBreakdowns,
     };
   });
-
-  const haTopPeaks = extractTopPeaks(
-    mainEnergyStats,
-    mainPowerStats,
-    mainPowerEntity?.attributes.unit_of_measurement,
-    3,
-  );
-  const topPeaks =
-    haTopPeaks.length > 0
-      ? haTopPeaks
-      : tibberData
-        ? extractTibberPeaks(tibberData, 3)
-        : [];
-
-  const haBaseload = estimateBaseloadWatts(
-    mainEnergyStats,
-    mainPowerStats,
-    mainPowerEntity?.attributes.unit_of_measurement,
-  );
-  const baseloadWatts =
-    haBaseload !== null
-      ? haBaseload
-      : tibberData
-        ? estimateTibberBaseloadWatts(tibberData)
-        : null;
 
   const haCheapest = findCheapestPriceWindows(
     priceEntity,

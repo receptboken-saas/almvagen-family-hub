@@ -2,6 +2,11 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.9] – 2026-11-14 (Kalibrerad kategorifördelning för Uppvärmning, Baslast & Procentandelar)
+- **Smart fördelning av omätt värme vs. baslast (`energyEngine.ts`):** När *Uppvärmning & Klimat* saknar egen elmätare (t.ex. vattenburen värme/Netatmo-termostater utan NIBE-effektsensor) fördelas den omätta resteffekten och kWh från huvudmätaren ovanpå nattlig baslast till *Uppvärmning & Klimat* istället för att allt hamnar i *Övrig drift & Baslast*.
+- **Renare enhetsräkning i *Övrig drift & Baslast* (`energyEngine.ts`):** Räknar enbart aktiva/konfigurerade energikonsumenter (`source !== "none"`) i `deviceCount` för *Övrig drift & Baslast* så omätta brytare/sensorer inte blåser upp antalet.
+- **Tydligare procentandelar (`EnergyDashboard.tsx`):** Visar `<1%` och en synlig minimal stapel för kategorier med uppmätt förbrukning under 0,5 % istället för `0%`, samt exakt förfluten tid i innevarande månad i `getPeriodHours("month")`.
+
 ## [0.18.8] – 2026-11-14 (Ny 3-nivåers Energivy, Tibber-fallback för Idag/7d & fixad Realtidspuls)
 - **Ny 3-nivåers informationshierarki (`EnergyDashboard.tsx`):** Strukturerade om *Energi & Drift* i tre tydliga nivåer: (1) *Innevarande period* med framträdande kostnad (`kr`), förbrukning (`kWh`), elpris just nu, `kr/tim` just nu och huvudsäkringens belastning bredvid cirkelmätaren; (2) *Insikter & Besparing* (Effekttoppar, Bästa starttid, Nattlig baslast); (3) *Detaljerad uppdelning, Gemini Energirådgivare & Anpassade Widgets*.
 - **Fixad Realtidspuls (`EnergyGauge.tsx`, `EnergyDashboard.tsx`):** Cirkelmätaren använder nu `summary.liveTotalWatts`, `summary.totalPricePerKwh` och `summary.fuseMaxWatts` direkt från `computeEnergyDashboard` istället för att gissa bland `dashboard_widgets` (vilket tidigare kunde visa elprissensorn som Watt).

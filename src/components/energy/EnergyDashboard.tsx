@@ -616,13 +616,21 @@ export function EnergyDashboard({
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
-                          width: `${cat.sharePct}%`,
+                          width: `${
+                            cat.sharePct > 0
+                              ? cat.sharePct
+                              : cat.kwh > 0 || cat.liveWatts > 0
+                                ? 2
+                                : 0
+                          }%`,
                           backgroundColor: cat.color,
                         }}
                       />
                     </div>
                     <span className="tabular-nums w-9 text-right text-[11px] font-semibold text-[var(--text-secondary)]">
-                      {cat.sharePct}%
+                      {cat.sharePct === 0 && (cat.kwh > 0 || cat.liveWatts > 0)
+                        ? "<1%"
+                        : `${cat.sharePct}%`}
                     </span>
                   </div>
 
