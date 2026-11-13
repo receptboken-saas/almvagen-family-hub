@@ -1,113 +1,76 @@
 "use client";
 
-import { Zap, Flame, PlugZap, Coins } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { DynamicIcon } from "@/components/ui/IconResolver";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
+import type { DashboardWidget, WidgetCategory } from "@/lib/supabase/types";
 
-interface EnergyMetricDefinition {
-  id: string;
-  label: string;
-  entityIds: string[];
-  fallbackValue: string;
-  unitFallback: string;
-  subtitle: string;
-  icon: typeof Zap;
-  accentClass: string;
+interface EnergyOverviewProps {
+  widgets: DashboardWidget[];
+  isAdmin: boolean;
 }
 
-const ENERGY_METRICS: EnergyMetricDefinition[] = [
-  {
-    id: "tibber-power",
-    label: "Tibber Pulse",
-    entityIds: ["sensor.tibber_pulse_power", "sensor.power_almvagen_1"],
-    fallbackValue: "-- W",
-    unitFallback: "W",
-    subtitle: "Realtidseffekt",
-    icon: Zap,
-    accentClass: "text-amber-400 bg-amber-500/10",
-  },
-  {
-    id: "tibber-price",
-    label: "Elpris just nu",
-    entityIds: ["sensor.electricity_price_almvagen_1", "sensor.tibber_price"],
-    fallbackValue: "-- öre/kWh",
-    unitFallback: "kr/kWh",
-    subtitle: "Spotpris inkl. moms",
-    icon: Coins,
-    accentClass: "text-emerald-400 bg-emerald-500/10",
-  },
-  {
-    id: "zaptec",
-    label: "Zaptec Laddbox",
-    entityIds: ["sensor.zaptec_charger_status", "sensor.zaptec_status"],
-    fallbackValue: "--",
-    unitFallback: "",
-    subtitle: "Elbilsladdning",
-    icon: PlugZap,
-    accentClass: "text-sky-400 bg-sky-500/10",
-  },
-  {
-    id: "nibe",
-    label: "NIBE Värmepump",
-    entityIds: ["sensor.nibe_indoor_temp", "sensor.nibe_outdoor_temp"],
-    fallbackValue: "-- °C",
-    unitFallback: "°C",
-    subtitle: "Värme & varmvatten",
-    icon: Flame,
-    accentClass: "text-orange-400 bg-orange-500/10",
-  },
-];
+const CATEGORY_ACCENT: Record<WidgetCategory, string> = {
+  energy: "bg-amber-500/10 text-amber-400",
+  climate: "bg-orange-500/10 text-orange-400",
+  scene: "bg-sky-500/10 text-sky-400",
+  security: "bg-emerald-500/10 text-emerald-400",
+};
 
-function formatEntityValue(
+function formatWidgetValue(
   state: string | undefined,
-  unit: string | undefined,
-  fallback: string,
+  unit: string | null | undefined,
 ): string {
   if (!state || state === "unavailable" || state === "unknown") {
-    return fallback;
+    return unit ? `-- ${unit}` : "--";
   }
   return unit ? `${state} ${unit}` : state;
 }
 
-export function EnergyOverview() {
+export function EnergyOverview({ widgets, isAdmin }: EnergyOverviewProps) {
   const { isConnected, getEntity } = useHomeAssistant();
+
+  const visibleWidgets = widgets.filter((w) => isAdmin || !w.admin_only);
+
+  if (visibleWidgets.length === 0) {
+    return (
+      <Card className="border-dashed border-slate-800 bg-slate-900/40 text-center text-sm text-slate-400">
+        Inga översikts-widgets konfigurerade ännu.
+        {isAdmin && " Öppna 'Redigera hemmet' för att lägga till."}
+      </Card>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {ENERGY_METRICS.map((metric) => {
-        const Icon = metric.icon;
-        const matchedEntity = isConnected
-          ? metric.entityIds.map((id) => getEntity(id)).find(Boolean)
-          : undefined;
-
-        const displayValue = matchedEntity
-          ? formatEntityValue(
-              matchedEntity.state,
-              matchedEntity.attributes.unit_of_measurement ??
-                metric.unitFallback,
-              metric.fallbackValue,
-            )
-          : isConnected
-            ? metric.fallbackValue
-            : metric.id === "zaptec"
-              ? "Ej ansluten"
-              : metric.fallbackValue;
+      {visibleWidgets.map((widget) => {
+        const entity = isConnected ? getEntity(widget.ha_entity_id) : undefined;
+        const unit =
+          widget.unit ?? entity?.attributes.unit_of_measurement ?? null;
+        const displayValue = formatWidgetValue(entity?.state, unit);
+        const accentClass =
+          CATEGORY_ACCENT[widget.widget_category] ??
+          "bg-sky-500/10 text-sky-400";
 
         return (
-          <Card key={metric.id} className="flex items-center gap-4">
+          <Card key={widget.id} className="flex items-center gap-4">
             <div
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${metric.accentClass}`}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${accentClass}`}
             >
-              <Icon className="h-6 w-6" aria-hidden="true" />
+              <DynamicIcon name={widget.icon} className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                {metric.label}
+              <p className="truncate text-xs font-medium uppercase tracking-wider text-slate-400">
+                {widget.title}
               </p>
               <p className="mt-0.5 truncate text-xl font-semibold text-slate-100">
                 {displayValue}
               </p>
-              <p className="text-xs text-slate-500">{metric.subtitle}</p>
+              {widget.subtitle && (
+                <p className="truncate text-xs text-slate-500">
+                  {widget.subtitle}
+                </p>
+              )}
             </div>
           </Card>
         );
