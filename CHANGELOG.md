@@ -2,6 +2,10 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.10] – 2026-11-14 (Sprint 6.1: Rullande Kärl-schema med 100 % exakta datum)
+- **Exakt rullande kärl-schema (`WasteScheduleCard.tsx`):** Lade till sektionen *"Skapa rullande kärl-schema (100 % exakt)"* överst i inställningspanelen (*"Ställ in kommun & kärl"*). Användaren väljer kärl (snabbvalspiller för *Kärl 1 (Mat- & Restavfall)*, *Kärl 2 (Förpackningar)*, *Trädgårdsavfall* eller eget namn), nästa kända tömningsdatum (ankardatum) samt intervall (*Varannan vecka / 14 dagar*, *Var 4:e vecka / 28 dagar* eller *Varje vecka / 7 dagar*).
+- **Batch-generering & rensning i Supabase (`WasteScheduleCard.tsx`):** Knappen *"Generera kommande 6 månader"* rensar gamla framtida `waste`-händelser för samma kärl-titel, beräknar exakta datum för kommande 26 veckor utan tidszons-/DST-avvikelser och sparar i ett svep till `weekly_events` (`category: 'waste'`, `source: 'rolling_schedule'`), samt erbjuder *"Rensa alla kommande tömningar"* för snabb nollställning.
+
 ## [0.18.9] – 2026-11-14 (Kalibrerad kategorifördelning för Uppvärmning, Baslast & Procentandelar)
 - **Smart fördelning av omätt värme vs. baslast (`energyEngine.ts`):** När *Uppvärmning & Klimat* saknar egen elmätare (t.ex. vattenburen värme/Netatmo-termostater utan NIBE-effektsensor) fördelas den omätta resteffekten och kWh från huvudmätaren ovanpå nattlig baslast till *Uppvärmning & Klimat* istället för att allt hamnar i *Övrig drift & Baslast*.
 - **Renare enhetsräkning i *Övrig drift & Baslast* (`energyEngine.ts`):** Räknar enbart aktiva/konfigurerade energikonsumenter (`source !== "none"`) i `deviceCount` för *Övrig drift & Baslast* så omätta brytare/sensorer inte blåser upp antalet.

@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle,
+  CalendarClock,
   CheckCircle2,
   Loader2,
   Plus,
+  Repeat,
   Settings2,
   Sparkles,
   Trash2,
@@ -27,6 +29,42 @@ interface SyncWasteResponse {
   synced_count?: number;
   events_count?: number;
   error?: string;
+}
+
+type RollingIntervalDays = 7 | 14 | 28;
+
+const BIN_PRESETS = [
+  "Kärl 1 (Mat- & Restavfall)",
+  "Kärl 2 (Förpackningar)",
+  "Trädgårdsavfall",
+] as const;
+
+const INTERVAL_OPTIONS: ReadonlyArray<{
+  days: RollingIntervalDays;
+  label: string;
+}> = [
+  { days: 14, label: "Varannan vecka (var 14:e dag)" },
+  { days: 28, label: "Var 4:e vecka (var 28:e dag)" },
+  { days: 7, label: "Varje vecka (var 7:e dag)" },
+];
+
+const ROLLING_WEEKS = 26;
+
+function getTodayIsoDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToIsoDate(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  const year = dt.getUTCFullYear();
+  const month = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(dt.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function diffDaysFromToday(dateStr: string): number {
@@ -92,9 +130,15 @@ export function WasteScheduleCard({
     householdSettings?.address_area ?? "",
   );
   const [manualTitle, setManualTitle] = useState("");
-  const [manualDate, setManualDate] = useState(() =>
-    new Date().toISOString().slice(0, 10),
+  const [manualDate, setManualDate] = useState(() => getTodayIsoDate());
+  const [rollingBinName, setRollingBinName] = useState<string>(BIN_PRESETS[0]);
+  const [rollingAnchorDate, setRollingAnchorDate] = useState(() =>
+    getTodayIsoDate(),
   );
+  const [rollingIntervalDays, setRollingIntervalDays] =
+    useState<RollingIntervalDays>(14);
+  const [generatingRolling, setGeneratingRolling] = useState(false);
+  const [clearingUpcoming, setClearingUpcoming] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -119,6 +163,133 @@ export function WasteScheduleCard({
   }, [weeklyEvents, propertyId]);
 
   if (!propertyId) return null;
+
+  async function handleGenerateRollingSchedule(e: FormEvent) {
+    e.preventDefault();
+    const supabase = getSupabaseClient();
+    const cleanBinName = rollingBinName.trim();
+    if (
+      !supabase ||
+      !propertyId ||
+      !cleanBinName ||
+      !rollingAnchorDate ||
+      generatingRolling
+    ) {
+      return;
+    }
+
+    setGeneratingRolling(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const todayStr = getTodayIsoDate();
+      const { error: deleteError } = await supabase
+        .from("weekly_events")
+        .delete()
+        .eq("property_id", propertyId)
+        .eq("category", "waste")
+        .eq("title", cleanBinName)
+        .gte("start_date", todayStr);
+
+      if (deleteError) {
+        setErrorMessage(deleteError.message);
+        return;
+      }
+
+      const subtitle =
+        municipalityInput.trim() ||
+        householdSettings?.municipality?.trim() ||
+        null;
+
+      const totalDays = ROLLING_WEEKS * 7;
+      const rows: Array<{
+        property_id: string;
+        profile_id: null;
+        category: "waste";
+        title: string;
+        subtitle: string | null;
+        start_date: string;
+        end_date: string;
+        source: "rolling_schedule";
+      }> = [];
+
+      for (
+        let offset = 0;
+        offset <= totalDays;
+        offset += rollingIntervalDays
+      ) {
+        const pickupDate = addDaysToIsoDate(rollingAnchorDate, offset);
+        rows.push({
+          property_id: propertyId,
+          profile_id: null,
+          category: "waste",
+          title: cleanBinName,
+          subtitle,
+          start_date: pickupDate,
+          end_date: pickupDate,
+          source: "rolling_schedule",
+        });
+      }
+
+      const { error: insertError } = await supabase
+        .from("weekly_events")
+        .insert(rows);
+
+      if (insertError) {
+        setErrorMessage(insertError.message);
+        return;
+      }
+
+      setStatusMessage(
+        `${rows.length} exakta tömningar skapade för ${cleanBinName} (var ${rollingIntervalDays}:e dag).`,
+      );
+      if (onDataChanged) await onDataChanged();
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : "Kunde inte generera rullande schema.",
+      );
+    } finally {
+      setGeneratingRolling(false);
+    }
+  }
+
+  async function handleClearAllUpcoming() {
+    const supabase = getSupabaseClient();
+    if (!supabase || !propertyId || clearingUpcoming) return;
+
+    setClearingUpcoming(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const todayStr = getTodayIsoDate();
+      const { error } = await supabase
+        .from("weekly_events")
+        .delete()
+        .eq("property_id", propertyId)
+        .eq("category", "waste")
+        .gte("start_date", todayStr);
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setStatusMessage("Alla kommande tömningar har rensats.");
+      if (onDataChanged) await onDataChanged();
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : "Kunde inte rensa kommande tömningar.",
+      );
+    } finally {
+      setClearingUpcoming(false);
+    }
+  }
 
   async function handleGeminiSync(e: FormEvent) {
     e.preventDefault();
@@ -272,74 +443,217 @@ export function WasteScheduleCard({
         )}
 
         {showSettings && (
-          <form
-            onSubmit={handleGeminiSync}
-            className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/55 p-3.5"
-          >
-            <div className="space-y-1">
-              <label
-                htmlFor="waste-municipality"
-                className="block text-[11px] font-semibold text-[var(--text-secondary)]"
-              >
-                Kommun
-              </label>
-              <input
-                id="waste-municipality"
-                type="text"
-                required
-                value={municipalityInput}
-                onChange={(e) => setMunicipalityInput(e.target.value)}
-                placeholder="T.ex. Svedala kommun"
-                className="min-h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none"
-              />
-            </div>
+          <div className="space-y-3">
+            <form
+              onSubmit={handleGenerateRollingSchedule}
+              className="space-y-3 rounded-2xl border border-[#6B8E6B]/35 bg-[#6B8E6B]/8 p-3.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Repeat
+                    className="h-4 w-4 shrink-0 text-[#6B8E6B]"
+                    aria-hidden="true"
+                  />
+                  <h4 className="text-xs font-semibold text-[var(--text-primary)]">
+                    Skapa rullande kärl-schema (100 % exakt)
+                  </h4>
+                </div>
+                <span className="rounded-full bg-[#6B8E6B]/15 px-2 py-0.5 text-[10px] font-semibold text-[#6B8E6B]">
+                  26 veckor
+                </span>
+              </div>
 
-            <div className="space-y-1">
-              <label
-                htmlFor="waste-area-bins"
-                className="block text-[11px] font-semibold text-[var(--text-secondary)]"
-              >
-                Område / Kärl / Nästa tömningsdag (valfritt för exakt synk)
-              </label>
-              <textarea
-                id="waste-area-bins"
-                rows={2}
-                value={areaInput}
-                onChange={(e) => setAreaInput(e.target.value)}
-                placeholder="T.ex. Klågerup – Fyrfack 1 (Mat/Rest) tisdagar udda veckor, Fyrfack 2 var 4:e vecka"
-                className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none"
-              />
-            </div>
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-semibold text-[var(--text-secondary)]">
+                  Kärl / Tunna
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {BIN_PRESETS.map((preset) => {
+                    const active = rollingBinName === preset;
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setRollingBinName(preset)}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                          active
+                            ? "border-[#6B8E6B] bg-[#6B8E6B] text-white"
+                            : "border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[#6B8E6B] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  id="rolling-bin-name"
+                  type="text"
+                  required
+                  value={rollingBinName}
+                  onChange={(e) => setRollingBinName(e.target.value)}
+                  placeholder="T.ex. Kärl 1 (Mat- & Restavfall)"
+                  className="min-h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none"
+                />
+              </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <button
-                type="submit"
-                disabled={syncing || !municipalityInput.trim()}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#6B8E6B] px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {syncing ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Hämtar schema…</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3.5 w-3.5 text-[#F2CF88]" />
-                    <span>Hämta schema med Gemini</span>
-                  </>
-                )}
-              </button>
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label
+                    htmlFor="rolling-anchor-date"
+                    className="block text-[11px] font-semibold text-[var(--text-secondary)]"
+                  >
+                    Nästa kända tömningsdatum
+                  </label>
+                  <input
+                    id="rolling-anchor-date"
+                    type="date"
+                    required
+                    value={rollingAnchorDate}
+                    onChange={(e) => setRollingAnchorDate(e.target.value)}
+                    className="min-h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-xs text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+                  />
+                </div>
 
-              <button
-                type="button"
-                onClick={() => setShowManualForm((prev) => !prev)}
-                className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Lägg till enstaka tömning</span>
-              </button>
-            </div>
-          </form>
+                <div className="space-y-1">
+                  <label
+                    htmlFor="rolling-interval"
+                    className="block text-[11px] font-semibold text-[var(--text-secondary)]"
+                  >
+                    Intervall
+                  </label>
+                  <select
+                    id="rolling-interval"
+                    value={rollingIntervalDays}
+                    onChange={(e) =>
+                      setRollingIntervalDays(
+                        Number(e.target.value) as RollingIntervalDays,
+                      )
+                    }
+                    className="min-h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-xs text-[var(--text-primary)] focus:border-[#6B8E6B] focus:outline-none"
+                  >
+                    {INTERVAL_OPTIONS.map((opt) => (
+                      <option key={opt.days} value={opt.days}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                <button
+                  type="submit"
+                  disabled={
+                    generatingRolling ||
+                    !rollingBinName.trim() ||
+                    !rollingAnchorDate
+                  }
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#6B8E6B] px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {generatingRolling ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Genererar…</span>
+                    </>
+                  ) : (
+                    <>
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      <span>Generera kommande 6 månader</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAllUpcoming}
+                  disabled={clearingUpcoming || upcomingPickups.length === 0}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#C86D51]/40 bg-[var(--bg-card)] px-3 text-xs font-medium text-[#C86D51] transition-colors hover:bg-[#C86D51]/10 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {clearingUpcoming ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Rensar…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Rensa alla kommande tömningar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            <form
+              onSubmit={handleGeminiSync}
+              className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/55 p-3.5"
+            >
+              <div className="space-y-1">
+                <label
+                  htmlFor="waste-municipality"
+                  className="block text-[11px] font-semibold text-[var(--text-secondary)]"
+                >
+                  Kommun
+                </label>
+                <input
+                  id="waste-municipality"
+                  type="text"
+                  required
+                  value={municipalityInput}
+                  onChange={(e) => setMunicipalityInput(e.target.value)}
+                  placeholder="T.ex. Svedala kommun"
+                  className="min-h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="waste-area-bins"
+                  className="block text-[11px] font-semibold text-[var(--text-secondary)]"
+                >
+                  Område / Kärl / Nästa tömningsdag (valfritt för AI-synk)
+                </label>
+                <textarea
+                  id="waste-area-bins"
+                  rows={2}
+                  value={areaInput}
+                  onChange={(e) => setAreaInput(e.target.value)}
+                  placeholder="T.ex. Klågerup – Fyrfack 1 (Mat/Rest) tisdagar udda veckor, Fyrfack 2 var 4:e vecka"
+                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 focus:border-[#6B8E6B] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="submit"
+                  disabled={syncing || !municipalityInput.trim()}
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[#6B8E6B] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Hämtar schema…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5 text-[#D49A42]" />
+                      <span>Hämta schema med Gemini</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowManualForm((prev) => !prev)}
+                  className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Lägg till enstaka tömning</span>
+                </button>
+              </div>
+            </form>
+          </div>
         )}
 
         {showManualForm && (
