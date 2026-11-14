@@ -11,6 +11,7 @@ export const HUB_VIEW_OPTIONS: { id: HubViewId; label: string }[] = [
 
 export const SYSTEM_NOTE_PREFIXES = [
   "[HUB_PREF:",
+  "[HA_CONFIG:",
   "[DINNER:",
   "[WASTE:",
   "[CALENDAR:",
@@ -26,34 +27,12 @@ export function isValidHubView(value: string | null | undefined): value is HubVi
   return value === "home" || value === "family" || value === "energy";
 }
 
-const LOCAL_VIEW_PREFIX = "almvagen_default_view_";
-
-export function getLocalDefaultView(profileId: string): HubViewId | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const val = window.localStorage.getItem(`${LOCAL_VIEW_PREFIX}${profileId}`);
-    return isValidHubView(val) ? val : null;
-  } catch {
-    return null;
-  }
-}
-
-export function setLocalDefaultView(profileId: string, view: HubViewId): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(`${LOCAL_VIEW_PREFIX}${profileId}`, view);
-  } catch {
-    // Ignore storage errors
-  }
-}
-
 export async function fetchProfileDefaultView(
   profileId: string,
   propertyId: string | null,
 ): Promise<HubViewId | null> {
-  const local = getLocalDefaultView(profileId);
   const supabase = getSupabaseClient();
-  if (!supabase || !propertyId) return local;
+  if (!supabase || !propertyId) return null;
 
   const prefix = `[HUB_PREF:default_view:${profileId}]`;
   const { data, error } = await supabase
@@ -67,11 +46,10 @@ export async function fetchProfileDefaultView(
   if (!error && data && data.length > 0) {
     const raw = (data[0].content as string).slice(prefix.length).trim();
     if (isValidHubView(raw)) {
-      setLocalDefaultView(profileId, raw);
       return raw;
     }
   }
-  return local;
+  return null;
 }
 
 export async function saveProfileDefaultView(
@@ -79,7 +57,6 @@ export async function saveProfileDefaultView(
   propertyId: string | null,
   view: HubViewId,
 ): Promise<void> {
-  setLocalDefaultView(profileId, view);
   const supabase = getSupabaseClient();
   if (!supabase || !propertyId) return;
 

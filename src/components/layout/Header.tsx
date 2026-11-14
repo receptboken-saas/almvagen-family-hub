@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ui/ThemeProvider";
 import { AvatarBadge } from "@/components/ui/AvatarBadge";
 import { HAConfigModal } from "@/components/ui/HAConfigModal";
 import { ProfileQuickMenu } from "@/components/layout/ProfileQuickMenu";
+import { WeatherBadge } from "@/components/layout/WeatherBadge";
 
 interface HeaderProps {
   propertyName: string;
@@ -90,8 +91,9 @@ export function Header({
           )}
         </div>
 
-        {/* Right: 2 clean anchors (ThemeToggle + Profile Pill) */}
+        {/* Right: Weather + ThemeToggle + Profile Pill */}
         <div className="flex shrink-0 items-center gap-2">
+          <WeatherBadge />
           <ThemeToggle compact />
 
           <div className="relative">

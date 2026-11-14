@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { X, Eye, EyeOff, Plug, Unplug, Trash2 } from "lucide-react";
 import { useHomeAssistant } from "@/lib/ha/useHomeAssistant";
 
@@ -25,16 +25,40 @@ export function HAConfigModal({ isOpen, onClose }: HAConfigModalProps) {
   const [urlInput, setUrlInput] = useState(wsUrl);
   const [tokenInput, setTokenInput] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUrlInput(wsUrl);
+  }, [wsUrl]);
 
   if (!isOpen) return null;
 
   const entityCount = Object.keys(entities).length;
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!tokenInput.trim()) return;
-    connectWithConfig(urlInput, tokenInput);
-    setTokenInput("");
+    if (!tokenInput.trim() || isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    const result = await connectWithConfig(urlInput, tokenInput);
+    setIsSaving(false);
+    if (result.error) {
+      setSaveError(`Kunde inte spara i molnet: ${result.error}`);
+    } else {
+      setTokenInput("");
+    }
+  }
+
+  async function handleClear() {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    const result = await clearConfig();
+    setIsSaving(false);
+    if (result.error) {
+      setSaveError(`Kunde inte rensa från molnet: ${result.error}`);
+    }
   }
 
   return (
@@ -54,7 +78,7 @@ export function HAConfigModal({ isOpen, onClose }: HAConfigModalProps) {
               Home Assistant-anslutning
             </h2>
             <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-              Sparas lokalt i webbläsaren (localStorage) för direkt anslutning.
+              Sparas i molnet (Supabase) så att alla familjens enheter ansluter automatiskt.
             </p>
           </div>
           <button
@@ -78,9 +102,9 @@ export function HAConfigModal({ isOpen, onClose }: HAConfigModalProps) {
                   : "Ej ansluten"}
             </span>
           </div>
-          {error && (
+          {(error || saveError) && (
             <p className="mt-2 rounded-lg bg-[#C86D51]/15 px-3 py-2 text-xs text-[#C86D51]">
-              {error}
+              {saveError ?? error}
             </p>
           )}
         </div>
@@ -155,8 +179,9 @@ export function HAConfigModal({ isOpen, onClose }: HAConfigModalProps) {
               {hasToken && (
                 <button
                   type="button"
-                  onClick={clearConfig}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#C86D51]/40 bg-[#C86D51]/10 px-4 py-2 text-sm font-medium text-[#C86D51] hover:bg-[#C86D51]/20"
+                  onClick={handleClear}
+                  disabled={isSaving}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#C86D51]/40 bg-[#C86D51]/10 px-4 py-2 text-sm font-medium text-[#C86D51] hover:bg-[#C86D51]/20 disabled:opacity-40"
                 >
                   <Trash2 className="h-4 w-4" />
                   <span>Rensa token</span>
@@ -166,11 +191,11 @@ export function HAConfigModal({ isOpen, onClose }: HAConfigModalProps) {
 
             <button
               type="submit"
-              disabled={!tokenInput.trim()}
+              disabled={!tokenInput.trim() || isSaving}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#6B8E6B] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plug className="h-4 w-4" />
-              <span>Spara &amp; anslut</span>
+              <span>{isSaving ? "Sparar…" : "Spara & anslut"}</span>
             </button>
           </div>
         </form>

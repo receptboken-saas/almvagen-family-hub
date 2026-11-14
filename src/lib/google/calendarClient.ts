@@ -4,7 +4,6 @@ export const GOOGLE_CALENDAR_SCOPES =
   "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly";
 
 const GOOGLE_TOKEN_STORAGE_KEY = "almvagen_google_calendar_token";
-const GOOGLE_CAL_CONFIG_PREFIX = "almvagen_google_cal_config_";
 const GOOGLE_CAL_NOTE_PREFIX = "[HUB_PREF:google_calendar]";
 
 export interface GoogleCalendarConfig {
@@ -72,31 +71,12 @@ export function clearCachedGoogleProviderToken(): void {
   }
 }
 
-function getLocalCalendarConfig(propertyId: string): GoogleCalendarConfig | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(
-      `${GOOGLE_CAL_CONFIG_PREFIX}${propertyId}`,
-    );
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<GoogleCalendarConfig>;
-    if (!parsed.calendarId || !parsed.calendarSummary) return null;
-    return {
-      calendarId: parsed.calendarId,
-      calendarSummary: parsed.calendarSummary,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export async function fetchGoogleCalendarConfig(
   propertyId: string | null,
 ): Promise<GoogleCalendarConfig | null> {
   if (!propertyId) return null;
-  const local = getLocalCalendarConfig(propertyId);
   const supabase = getSupabaseClient();
-  if (!supabase) return local;
+  if (!supabase) return null;
 
   const { data, error } = await supabase
     .from("family_notes")
@@ -113,39 +93,22 @@ export async function fetchGoogleCalendarConfig(
     try {
       const parsed = JSON.parse(rawJson) as Partial<GoogleCalendarConfig>;
       if (parsed.calendarId && parsed.calendarSummary) {
-        const cfg: GoogleCalendarConfig = {
+        return {
           calendarId: parsed.calendarId,
           calendarSummary: parsed.calendarSummary,
         };
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(
-            `${GOOGLE_CAL_CONFIG_PREFIX}${propertyId}`,
-            JSON.stringify(cfg),
-          );
-        }
-        return cfg;
       }
     } catch {
       // Ignore malformed JSON
     }
   }
-  return local;
+  return null;
 }
 
 export async function saveGoogleCalendarConfig(
   propertyId: string,
   config: GoogleCalendarConfig,
 ): Promise<void> {
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(
-        `${GOOGLE_CAL_CONFIG_PREFIX}${propertyId}`,
-        JSON.stringify(config),
-      );
-    } catch {
-      // Ignore
-    }
-  }
   const supabase = getSupabaseClient();
   if (!supabase) return;
 

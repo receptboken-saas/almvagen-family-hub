@@ -217,6 +217,7 @@ export default function HomePage() {
             showEnergy={showEnergy}
             onSelectEnergyView={() => setActiveView("energy")}
             onSelectFamilyView={() => setActiveView("family")}
+            onOpenAdmin={() => setIsAdminOpen(true)}
           />
         )}
 

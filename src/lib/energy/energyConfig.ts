@@ -112,49 +112,11 @@ export const DEFAULT_ENERGY_CONFIG: EnergyHouseholdConfig = {
   trackedDevices: [],
 };
 
-const LOCAL_CFG_PREFIX = "almvagen_energy_cfg_";
-const LOCAL_AI_PREFIX = "almvagen_energy_ai_";
-
-export function getLocalEnergyConfig(
-  propertyId: string,
-): EnergyHouseholdConfig | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(`${LOCAL_CFG_PREFIX}${propertyId}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<EnergyHouseholdConfig>;
-    return {
-      ...DEFAULT_ENERGY_CONFIG,
-      ...parsed,
-      deviceOverrides: parsed.deviceOverrides ?? {},
-      trackedDevices: parsed.trackedDevices ?? [],
-    };
-  } catch {
-    return null;
-  }
-}
-
-function setLocalEnergyConfig(
-  propertyId: string,
-  config: EnergyHouseholdConfig,
-): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      `${LOCAL_CFG_PREFIX}${propertyId}`,
-      JSON.stringify(config),
-    );
-  } catch {
-    // Ignore storage quota errors
-  }
-}
-
 export async function fetchEnergyConfig(
   propertyId: string,
 ): Promise<EnergyHouseholdConfig> {
-  const local = getLocalEnergyConfig(propertyId);
   const supabase = getSupabaseClient();
-  if (!supabase) return local ?? DEFAULT_ENERGY_CONFIG;
+  if (!supabase) return DEFAULT_ENERGY_CONFIG;
 
   const prefix = `[ENERGY_CFG:${propertyId}]`;
   const { data, error } = await supabase
@@ -169,26 +131,23 @@ export async function fetchEnergyConfig(
     const rawJson = (data[0].content as string).slice(prefix.length).trim();
     try {
       const parsed = JSON.parse(rawJson) as Partial<EnergyHouseholdConfig>;
-      const merged: EnergyHouseholdConfig = {
+      return {
         ...DEFAULT_ENERGY_CONFIG,
         ...parsed,
         deviceOverrides: parsed.deviceOverrides ?? {},
         trackedDevices: parsed.trackedDevices ?? [],
       };
-      setLocalEnergyConfig(propertyId, merged);
-      return merged;
     } catch {
-      // Fallback to local
+      // Malformed JSON in cloud config
     }
   }
-  return local ?? DEFAULT_ENERGY_CONFIG;
+  return DEFAULT_ENERGY_CONFIG;
 }
 
 export async function saveEnergyConfig(
   propertyId: string,
   config: EnergyHouseholdConfig,
 ): Promise<void> {
-  setLocalEnergyConfig(propertyId, config);
   const supabase = getSupabaseClient();
   if (!supabase) return;
 
@@ -212,18 +171,8 @@ export async function saveEnergyConfig(
 export async function fetchEnergyAiCache(
   propertyId: string,
 ): Promise<EnergyAiAnalysisCache | null> {
-  let local: EnergyAiAnalysisCache | null = null;
-  if (typeof window !== "undefined") {
-    try {
-      const raw = window.localStorage.getItem(`${LOCAL_AI_PREFIX}${propertyId}`);
-      if (raw) local = JSON.parse(raw) as EnergyAiAnalysisCache;
-    } catch {
-      // Ignore
-    }
-  }
-
   const supabase = getSupabaseClient();
-  if (!supabase) return local;
+  if (!supabase) return null;
 
   const prefix = `[ENERGY_AI:${propertyId}]`;
   const { data, error } = await supabase
@@ -237,35 +186,18 @@ export async function fetchEnergyAiCache(
   if (!error && data && data.length > 0) {
     const rawJson = (data[0].content as string).slice(prefix.length).trim();
     try {
-      const parsed = JSON.parse(rawJson) as EnergyAiAnalysisCache;
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          `${LOCAL_AI_PREFIX}${propertyId}`,
-          JSON.stringify(parsed),
-        );
-      }
-      return parsed;
+      return JSON.parse(rawJson) as EnergyAiAnalysisCache;
     } catch {
       // Ignore
     }
   }
-  return local;
+  return null;
 }
 
 export async function saveEnergyAiCache(
   propertyId: string,
   cache: EnergyAiAnalysisCache,
 ): Promise<void> {
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(
-        `${LOCAL_AI_PREFIX}${propertyId}`,
-        JSON.stringify(cache),
-      );
-    } catch {
-      // Ignore
-    }
-  }
   const supabase = getSupabaseClient();
   if (!supabase) return;
 

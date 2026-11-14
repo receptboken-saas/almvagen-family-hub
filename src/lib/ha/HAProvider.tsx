@@ -3,13 +3,25 @@
 import {
   createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { AuthContext } from "@/lib/supabase/AuthProvider";
 import type { HAConnectionStatus, HassEntities, HassEntity } from "./types";
-import { haWsClient, type HAWebSocketSnapshot } from "./wsClient";
+import {
+  clearLegacyLocalHaConfig,
+  haWsClient,
+  readLegacyLocalHaConfig,
+  type HAWebSocketSnapshot,
+} from "./wsClient";
+import {
+  clearCloudHaConfig,
+  fetchCloudHaConfig,
+  saveCloudHaConfig,
+} from "./haCloudConfig";
 
 export interface HAContextValue {
   status: HAConnectionStatus;
@@ -18,6 +30,7 @@ export interface HAContextValue {
   entities: HassEntities;
   wsUrl: string;
   hasToken: boolean;
+  isLoadingConfig: boolean;
   getEntity: (entityId: string) => HassEntity | undefined;
   callService: (
     domain: string,
@@ -28,25 +41,82 @@ export interface HAContextValue {
     type: string,
     payload?: Record<string, unknown>,
   ) => Promise<T>;
-  connectWithConfig: (wsUrl: string, token: string) => void;
+  connectWithConfig: (
+    wsUrl: string,
+    token: string,
+  ) => Promise<{ error: string | null }>;
   disconnect: () => void;
-  clearConfig: () => void;
+  clearConfig: () => Promise<{ error: string | null }>;
 }
 
 export const HAContext = createContext<HAContextValue | null>(null);
 
 export function HAProvider({ children }: { children: ReactNode }) {
+  const auth = useContext(AuthContext);
+  const session = auth?.session ?? null;
+  const authLoading = auth?.isLoading ?? false;
+
   const [snapshot, setSnapshot] = useState<HAWebSocketSnapshot>(() =>
     haWsClient.getSnapshot(),
   );
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = haWsClient.subscribe(setSnapshot);
-    if (haWsClient.getSnapshot().hasToken) {
-      haWsClient.connect();
-    }
-    return unsubscribe;
+    return haWsClient.subscribe(setSnapshot);
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!session) {
+      haWsClient.clearConfig();
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingConfig(true);
+
+    void (async () => {
+      try {
+        const cloudConfig = await fetchCloudHaConfig();
+        if (cancelled) return;
+
+        if (cloudConfig) {
+          clearLegacyLocalHaConfig();
+          haWsClient.setConfig(cloudConfig.wsUrl, cloudConfig.token);
+          haWsClient.connect();
+          return;
+        }
+
+        // One-time migration from legacy localStorage if present
+        const legacy = readLegacyLocalHaConfig();
+        if (legacy) {
+          haWsClient.setConfig(legacy.wsUrl, legacy.token);
+          haWsClient.connect();
+          const { error: saveErr } = await saveCloudHaConfig(
+            legacy.wsUrl,
+            legacy.token,
+          );
+          if (!saveErr) {
+            clearLegacyLocalHaConfig();
+          }
+          return;
+        }
+
+        if (haWsClient.getSnapshot().hasToken) {
+          haWsClient.connect();
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingConfig(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, authLoading]);
 
   const getEntity = useCallback(
     (entityId: string) => snapshot.entities[entityId],
@@ -68,18 +138,23 @@ export function HAProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const connectWithConfig = useCallback((wsUrl: string, token: string) => {
-    haWsClient.disconnect();
-    haWsClient.setConfig(wsUrl, token, true);
-    haWsClient.connect();
-  }, []);
+  const connectWithConfig = useCallback(
+    async (wsUrl: string, token: string): Promise<{ error: string | null }> => {
+      haWsClient.disconnect();
+      haWsClient.setConfig(wsUrl, token);
+      haWsClient.connect();
+      return await saveCloudHaConfig(wsUrl, token);
+    },
+    [],
+  );
 
   const disconnect = useCallback(() => {
     haWsClient.disconnect();
   }, []);
 
-  const clearConfig = useCallback(() => {
-    haWsClient.clearStoredConfig();
+  const clearConfig = useCallback(async (): Promise<{ error: string | null }> => {
+    haWsClient.clearConfig();
+    return await clearCloudHaConfig();
   }, []);
 
   const value = useMemo<HAContextValue>(
@@ -90,6 +165,7 @@ export function HAProvider({ children }: { children: ReactNode }) {
       entities: snapshot.entities,
       wsUrl: snapshot.wsUrl,
       hasToken: snapshot.hasToken,
+      isLoadingConfig,
       getEntity,
       callService,
       sendCommand,
@@ -99,6 +175,7 @@ export function HAProvider({ children }: { children: ReactNode }) {
     }),
     [
       snapshot,
+      isLoadingConfig,
       getEntity,
       callService,
       sendCommand,

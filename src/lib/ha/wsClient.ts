@@ -7,13 +7,42 @@ import type {
   HassEntity,
 } from "./types";
 
-const STORAGE_KEY = "almvagen_ha_config";
+const LEGACY_STORAGE_KEY = "almvagen_ha_config";
 
 export const DEFAULT_HA_WS_URL =
   process.env.NEXT_PUBLIC_HA_WS_URL ??
   "wss://almvagen.sidequestlabs.se/api/websocket";
 
 const ENV_HA_TOKEN = process.env.NEXT_PUBLIC_HA_TOKEN ?? "";
+
+/**
+ * Reads any legacy Home Assistant config from localStorage for one-time
+ * migration to Supabase, without keeping it stored locally.
+ */
+export function readLegacyLocalHaConfig(): HAConnectionConfig | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<HAConnectionConfig>;
+    if (!parsed.token?.trim()) return null;
+    return {
+      wsUrl: parsed.wsUrl?.trim() || DEFAULT_HA_WS_URL,
+      token: parsed.token.trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearLegacyLocalHaConfig(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
 
 export interface HAWebSocketSnapshot {
   status: HAConnectionStatus;
@@ -51,31 +80,8 @@ class HAWebSocketClient {
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private manualDisconnect = false;
-  private initializedFromStorage = false;
-
-  constructor() {
-    this.loadStoredConfig();
-  }
-
-  private loadStoredConfig(): void {
-    if (this.initializedFromStorage || typeof window === "undefined") {
-      return;
-    }
-    this.initializedFromStorage = true;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<HAConnectionConfig>;
-        if (parsed.wsUrl) this.wsUrl = parsed.wsUrl;
-        if (parsed.token) this.token = parsed.token;
-      }
-    } catch {
-      // Ignore malformed storage entries
-    }
-  }
 
   public getSnapshot(): HAWebSocketSnapshot {
-    this.loadStoredConfig();
     return {
       status: this.status,
       error: this.error,
@@ -100,41 +106,22 @@ class HAWebSocketClient {
     }
   }
 
-  public setConfig(wsUrl: string, token: string, persist = true): void {
+  public setConfig(wsUrl: string, token: string): void {
     const cleanUrl = wsUrl.trim() || DEFAULT_HA_WS_URL;
     const cleanToken = token.trim();
     this.wsUrl = cleanUrl;
     this.token = cleanToken;
-
-    if (persist && typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ wsUrl: cleanUrl, token: cleanToken }),
-        );
-      } catch {
-        // Ignore storage quota errors
-      }
-    }
     this.notify();
   }
 
-  public clearStoredConfig(): void {
+  public clearConfig(): void {
     this.token = ENV_HA_TOKEN;
     this.wsUrl = DEFAULT_HA_WS_URL;
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(STORAGE_KEY);
-      } catch {
-        // Ignore
-      }
-    }
+    clearLegacyLocalHaConfig();
     this.disconnect();
   }
 
   public connect(): void {
-    this.loadStoredConfig();
-
     if (typeof window === "undefined") return;
     if (!this.token.trim()) {
       this.status = "disconnected";

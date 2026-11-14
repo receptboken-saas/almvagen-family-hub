@@ -2,6 +2,19 @@
 
 Alla större ändringar, funktioner och releaser dokumenteras här. Varje AI-agent och utvecklare ska uppdatera denna fil vid nya funktioner eller commits.
 
+## [0.18.12] – 2026-11-14 (KISS-sammanfattningar: Väder i sidhuvud, Media, Underhåll, Upptäckta & Admin-termostat)
+- **Väder i sidhuvudet (`WeatherBadge.tsx`, `Header.tsx`):** Auto-hämtar första aktiva `weather.*`-entiteten från Home Assistant WebSocket (utan hårdkodning) och visar temperatur och svenskt väderläge kompakt i sidhuvudet.
+- **KISS-utbyggnad av `HomeSummariesBar.tsx`:**
+  - **Dagens energi:** Energi-pillen kombinerar nu live-effekt (`W`) med dagens förbrukning (`kWh`) när tillgängligt (t.ex. `1 240 W · 5,6 kWh`).
+  - **Mediaspelare (villkorlig):** Auto-hämtar `media_player.*` och visas enbart när något spelas eller är pausat, med modal för Spela/Paus, Nästa spår och Volym.
+  - **Admin-termostatstyrning i Klimat-modalen:** `admin` har nu `−`/`+`-reglage (`0,5°`-steg) direkt på varje rums termostat i Klimat-modalen (övriga roller ser läs-vy).
+  - **Underhåll & Upptäckta enheter (endast Admin, villkorlig):** Visas enbart för `admin` när antal > 0. *Underhåll* listar låga batterier (`< 20 %`, exkl. mobiltelefoner) och otillgängliga rumsenheter; *Upptäckta* listar aktiva styrbara HA-enheter som ännu inte är kopplade till något rum med genväg till `AdminPanel`.
+
+## [0.18.11] – 2026-11-14 (100 % molnlagring i Supabase för Home Assistant-anslutning & inställningar)
+- **Home Assistant-anslutning i molnet (`haCloudConfig.ts`, `HAProvider.tsx`, `wsClient.ts`, `HAConfigModal.tsx`):** WebSocket-URL och Long-Lived Access Token sparas nu i Supabase (`family_notes` med systemprefix `[HA_CONFIG:default]`, dolt via `SYSTEM_NOTE_PREFIXES` i `familyMeta.ts`) istället för `localStorage`. Alla inloggade familjemedlemmar och väggplattor ansluter automatiskt oavsett enhet.
+- **Automatisk engångsmigrering (`HAProvider.tsx`, `wsClient.ts`):** Om en enhet har en äldre lokal `almvagen_ha_config` i `localStorage` flyttas den automatiskt till Supabase vid inloggning och rensas därefter lokalt.
+- **Renodlad molnlagring (`energyConfig.ts`, `familyMeta.ts`, `calendarClient.ts`):** Tog bort lokal `localStorage`-lagring/fallback för energiinställningar (inkl. Tibber-token), Gemini-energicache, standardvy per profil och Google Kalender-val så all hushållsdata enbart läses och sparas i Supabase.
+
 ## [0.18.10] – 2026-11-14 (Sprint 6.1: Rullande Kärl-schema med 100 % exakta datum)
 - **Exakt rullande kärl-schema (`WasteScheduleCard.tsx`):** Lade till sektionen *"Skapa rullande kärl-schema (100 % exakt)"* överst i inställningspanelen (*"Ställ in kommun & kärl"*). Användaren väljer kärl (snabbvalspiller för *Kärl 1 (Mat- & Restavfall)*, *Kärl 2 (Förpackningar)*, *Trädgårdsavfall* eller eget namn), nästa kända tömningsdatum (ankardatum) samt intervall (*Varannan vecka / 14 dagar*, *Var 4:e vecka / 28 dagar* eller *Varje vecka / 7 dagar*).
 - **Batch-generering & rensning i Supabase (`WasteScheduleCard.tsx`):** Knappen *"Generera kommande 6 månader"* rensar gamla framtida `waste`-händelser för samma kärl-titel, beräknar exakta datum för kommande 26 veckor utan tidszons-/DST-avvikelser och sparar i ett svep till `weekly_events` (`category: 'waste'`, `source: 'rolling_schedule'`), samt erbjuder *"Rensa alla kommande tömningar"* för snabb nollställning.
